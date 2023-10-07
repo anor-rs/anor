@@ -1,0 +1,17 @@
+[package]
+name = "anor"
+version = "0.1.0"
+edition = "2021"
+authors = ["Sheroz Khaydarov"]
+description = "Data Store"
+documentation = "https://docs.rs/anor"
+readme = "README.md"
+repository = "https://github.com/sheroz/anor"
+license = "MIT"
+keywords = ["data", "store", "cache"]
+categories = ["data-structures", "caching", "database", "filesystem"]
+
+[dependencies]
+log = "0.4"
+log4rs = "1.2"
+
