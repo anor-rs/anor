@@ -1,61 +1,60 @@
 # Roadmap
 
-- WIP: 1. Core Storage. Support for commonly used data types and structures
-  - WIP: 1.1 Storing: file, blob, json, xml, arrays, set, map, primitive types
-  - WIP: 1.2 Metafields: tags, descriptions, metadata
+1. Data Storage
+    - Storing: file, blob, json, xml, arrays, set, map, primitive types
+    - Metafields: tags, descriptions, metadata
   
-- WIP: 2. API Server (TCP)
-  - WIP: 2.1 basic functionality
-  - WIP: 2.2 async support
+2. API Server (TCP)
+    - basic functionality
+    - async support
 
-- WIP: 3. API Client (TCP)
-  - (+)  3.1 basic functionality
-  - WIP: 3.2 async support
+3. API Client (TCP)
+    - basic functionality
+    - async support
 
-- WIP: 4. File Storage Service (HTTP)
-  - WIP: 4.1 basic functionality
-  - WIP: 4.2 async support
-  - WIP: 4.3 streaming (seeking and reading data at given position)
-    - (+)  4.3.1 support for partial requests (Content-Range)
-    - WIP: 4.3.2 support for If-Range, If-Modified-Since, If-None-Match, Last-Modified, Etag
+4. Configuration
+   - server and client sections
 
-- WIP: 5. Configuration
-  - (+) 5.1 server and client sections
+5. Logging
+    - basic logging
 
-- WIP: 6. Logging
-  - (+) 6.1 basic functionality
+6. File Storage Service (HTTP)
+    - basic functionality
+    - async support
+    - streaming (seeking and reading data at given position)
+        - support for partial requests (Content-Range)
+        - support for If-Range, If-Modified-Since, If-None-Match, Last-Modified, Etag
 
-- 7. Authentification and Authorization
-  - 7.1 support for JWT
-  - 7.2 support for Fine-Grained Access Control
+7. Authentification and Authorization
+    - support for JWT
+    - support for Fine-Grained Access Control
 
-- 8. Remote collections
-  - 8.1 HashSet
-  - 8.2 HashMap
-  - 8.3 Vec
-  - 8.4 VecDeque
+8. Remote collections
+    - HashSet
+    - HashMap
+    - Vec
+    - VecDeque
 
-- 9. Scaling
-  - easy scaling
-    - support for built-in configuration service in nodes
-    - support for auto replicating of configuration parameters in claster nodes
-    - support for plug & play in adding a new node into claster and re-configurating of existing nodes
-      - new node needs to know at least one neighbour in the claster. The added node and other nodes would be updated after completing the re-configuration and re-building process of claster.
-    - any change in the claster configuration (adding new node, failing existing nodes), would be auto replicated to other nodes in the claster (no need for master node)
-    - clients would be auto-updated after re-configuration
-      - each client request includes a config_id parameter
-      - server node will analyze the received config_id and may respond with updated configuration settings
-    - clients and nodes use weighted graphs to optimize node/peer selection and other network operations.
-  - consistent hashing
-  - claster heartbeat
+9. Scaling
+    - cluster heartbeat
+    - consistent hashing
+    - easy scaling
+      - support for built-in configuration service in nodes
+      - support for auto replicating of configuration parameters in cluster nodes
+      - support for plug & play in adding a new node into cluster and re-configurating of existing nodes
+        - new node needs to know at least one neighbour in the cluster. The added node and other nodes would be updated after completing the re-configuration and re-building process of cluster
+      - any change in the cluster configuration (adding new node, failing existing nodes), would be auto replicated to other nodes in the cluster (no need for master node)
+      - clients would be notified and auto-updated after re-configuration
+        - each client request includes a config_id parameter
+        - server node will analyze the received config_id and may respond with updated configuration settings
+      - clients and nodes use weighted graphs to optimize node/peer selection and other network operations
+10. Caching
+    - client-side and server-side caching support
+    - cache evictions policies: LRU/LFU
 
-- 10. Caching
-  - support for evictions (LRU)
-  - support client-side and server-side caches
-
-- 11. File Storage Spaces
-  - support for folders
-  - support for path
+11. File Storage Spaces
+    - support for folders
+    - support for path
 
 ## Notes
 

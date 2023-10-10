@@ -9,4 +9,4 @@
 
 ## Project Stage
 
-**Research:** this project is at the design stage, nothing usable yet.
+**Research:** this project is at the design stage, with some sketches of work but nothing usable yet.

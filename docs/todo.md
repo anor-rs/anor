@@ -1,22 +1,13 @@
 # ToDo
 
-- API Server:  TCP, REST (?)
-  - Map(string,string)
-    - use [Protocol Buffers](https://protobuf.dev/) for [wire messages](https://github.com/tokio-rs/prost)
-    - set
-    - get
-    - e2e tests
-    - benchmarks (single thread, thread pooling and async)
+- API: Map(string,string) operation (TCP, REST?)
+  - server: thread pooling, async
+  - client: connection pooling, async
+  - [Protocol Buffers](https://protobuf.dev/) for [wire messages](https://github.com/tokio-rs/prost)
+  - e2e tests
+  - benchmarks (single thread, thread pooling and async)
 
-- API Client:  TCP, REST (?)
-  - Map(string,string)
-    - use [Protocol Buffers](https://protobuf.dev/) for [wire messages](https://github.com/tokio-rs/prost)
-    - set
-    - get
-    - e2e tests
-    - benchmarks (single thread, connection pooling and async)
-
-- File Storage Service
+- File Storage Service: HTTP
   - upload
   - download
   - delete
