@@ -1,9 +1,11 @@
 # ToDo
 
 - API: Map(string,string) operation (TCP, REST?)
+  - research and analysis of
+    - [Protocol Buffers](https://protobuf.dev/) for [wire messages](https://github.com/tokio-rs/prost)
+    - [MessagePack](https://msgpack.org/)
   - server: thread pooling, async
   - client: connection pooling, async
-  - [Protocol Buffers](https://protobuf.dev/) for [wire messages](https://github.com/tokio-rs/prost)
   - e2e tests
   - benchmarks (single thread, thread pooling and async)
 

@@ -5,7 +5,7 @@
 [![build & test](https://github.com/sheroz/anor/actions/workflows/ci.yml/badge.svg)](https://github.com/sheroz/anor/actions/workflows/ci.yml)
 [![MIT](https://img.shields.io/github/license/sheroz/anor)](https://github.com/sheroz/anor/tree/main/LICENSE.txt)
 
-<img src="docs/img/anor3-wb.svg" width=25%>
+<img src="docs/img/anor-wb.svg" width=25%>
 
 ## Project Stage
 
