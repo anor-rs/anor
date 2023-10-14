@@ -123,6 +123,9 @@ mod tests {
     use super::*;
     use crate::storage::storage_type::*;
 
+    const THREADS_COUNT: usize = 100;
+    const MAP_ENTRIES_PER_THREAD: usize = 10;
+
     #[test]
     pub fn storage_new_test() {
         let repo = StorageRepo::new();
@@ -244,11 +247,6 @@ mod tests {
 
     #[test]
     fn multithread_map_insert_test() {
-        let threads_count = 100;
-        let entries_count_per_thread = 10;
-
-        let mut threads: Vec<_> = Vec::with_capacity(threads_count);
-
         let key = "my_map";
         let repo = Arc::new(StorageRepo::new());
         // create a new map and insert into storage
@@ -264,9 +262,10 @@ mod tests {
         }
 
         // inserting map entires in multiple threads
-        for thread_number in 0..threads_count {
+        let mut threads = Vec::with_capacity(THREADS_COUNT);
+        for thread_number in 0..THREADS_COUNT {
             let repo_cloned = repo.clone();
-            let entries_count = entries_count_per_thread;
+            let entries_count = MAP_ENTRIES_PER_THREAD;
             let handler = thread::spawn(move || {
                 let mut storage = repo_cloned.storage_lock();
                 let mut map: HashMap<String, String> =
@@ -282,7 +281,7 @@ mod tests {
             threads.push(handler);
         }
 
-        // wait for completing threads
+        // wait until the finish of all the spawned threads
         for handler in threads {
             handler.join().unwrap();
         }
@@ -291,9 +290,9 @@ mod tests {
         {
             let storage = repo.storage_lock();
             let map = StorageRepo::get_object::<HashMap<String, String>>(&storage, key).unwrap();
-            assert_eq!(map.keys().count(), threads_count * entries_count_per_thread);
-            for thread_number in 0..threads_count {
-                for entry_number in 0..entries_count_per_thread {
+            assert_eq!(map.keys().count(), THREADS_COUNT * MAP_ENTRIES_PER_THREAD);
+            for thread_number in 0..THREADS_COUNT {
+                for entry_number in 0..MAP_ENTRIES_PER_THREAD {
                     let entry_key = format!("{}-{}", thread_number, entry_number);
                     let entry_value = format!("{}", thread_number * entry_number);
                     assert_eq!(map.get(&entry_key).unwrap(), &entry_value);
@@ -304,9 +303,6 @@ mod tests {
 
     #[test]
     fn multithread_map_get_test() {
-        let threads_count = 100;
-        let entries_count_per_thread = 10;
-
         let key = "my_map";
         let repo = Arc::new(StorageRepo::new());
 
@@ -314,8 +310,8 @@ mod tests {
         {
             let mut my_map = HashMap::<String, String>::new();
 
-            for thread_number in 0..threads_count {
-                for entry_number in 0..entries_count_per_thread {
+            for thread_number in 0..THREADS_COUNT {
+                for entry_number in 0..MAP_ENTRIES_PER_THREAD {
                     let entry_key = format!("{}-{}", thread_number, entry_number);
                     let entry_value = format!("{}", thread_number * entry_number);
                     my_map.insert(entry_key, entry_value);
@@ -330,12 +326,11 @@ mod tests {
             StorageRepo::insert(&mut storage, storage_item);
         }
 
-        let mut threads: Vec<_> = Vec::with_capacity(threads_count);
-
         // get map entires in multiple threads
-        for thread_number in 0..threads_count {
+        let mut threads = Vec::with_capacity(THREADS_COUNT);
+        for thread_number in 0..THREADS_COUNT {
             let repo_cloned = repo.clone();
-            let entries_count = entries_count_per_thread;
+            let entries_count = MAP_ENTRIES_PER_THREAD;
             let handler = thread::spawn(move || {
                 let mut storage = repo_cloned.storage_lock();
                 let map: HashMap<String, String> = StorageRepo::get_object(&storage, key).unwrap();
@@ -350,7 +345,7 @@ mod tests {
             threads.push(handler);
         }
 
-        // wait for completing threads
+        // wait until the finish of all the spawned threads
         for handler in threads {
             handler.join().unwrap();
         }
@@ -359,15 +354,12 @@ mod tests {
         {
             let storage = repo.storage_lock();
             let map = StorageRepo::get_object::<HashMap<String, String>>(&storage, key).unwrap();
-            assert_eq!(map.keys().count(), threads_count * entries_count_per_thread);
+            assert_eq!(map.keys().count(), THREADS_COUNT * MAP_ENTRIES_PER_THREAD);
         }
     }
 
     #[test]
     fn multithread_map_remove_test() {
-        let threads_count = 100;
-        let entries_count_per_thread = 10;
-
         let key = "my_map";
         let repo = Arc::new(StorageRepo::new());
 
@@ -375,8 +367,8 @@ mod tests {
         {
             let mut my_map = HashMap::<String, String>::new();
 
-            for thread_number in 0..threads_count {
-                for entry_number in 0..entries_count_per_thread {
+            for thread_number in 0..THREADS_COUNT {
+                for entry_number in 0..MAP_ENTRIES_PER_THREAD {
                     let entry_key = format!("{}-{}", thread_number, entry_number);
                     let entry_value = format!("{}", thread_number * entry_number);
                     my_map.insert(entry_key, entry_value);
@@ -391,12 +383,11 @@ mod tests {
             StorageRepo::insert(&mut storage, storage_item);
         }
 
-        let mut threads: Vec<_> = Vec::with_capacity(threads_count);
-
         // verify and remove map entires in multiple threads
-        for thread_number in 0..threads_count {
+        let mut threads = Vec::with_capacity(THREADS_COUNT);
+        for thread_number in 0..THREADS_COUNT {
             let repo_cloned = repo.clone();
-            let entries_count = entries_count_per_thread;
+            let entries_count = MAP_ENTRIES_PER_THREAD;
             let handler = thread::spawn(move || {
                 let mut storage = repo_cloned.storage_lock();
                 let mut map: HashMap<String, String> =
@@ -412,7 +403,7 @@ mod tests {
             threads.push(handler);
         }
 
-        // wait for completing threads
+        // wait until the finish of all the spawned threads
         for handler in threads {
             handler.join().unwrap();
         }
@@ -427,15 +418,12 @@ mod tests {
 
     #[test]
     fn multithread_multiobject_test() {
-        let threads_count = 100;
-        let entries_count_per_thread = 10;
-
         let key_prefix = "my_map";
         let repo = Arc::new(StorageRepo::new());
 
         // creating and inserting map objects in multiple threads
-        let mut threads: Vec<_> = Vec::with_capacity(threads_count);
-        for thread_number in 0..threads_count {
+        let mut threads = Vec::with_capacity(THREADS_COUNT);
+        for thread_number in 0..THREADS_COUNT {
             let repo_cloned = repo.clone();
             let object_key = format!("{}-{}", key_prefix, thread_number);
             let handler = thread::spawn(move || {
@@ -452,7 +440,7 @@ mod tests {
             threads.push(handler);
         }
 
-        // wait for completing threads
+        // wait until the finish of all the spawned threads
         for handler in threads {
             handler.join().unwrap();
         }
@@ -461,19 +449,19 @@ mod tests {
         {
             let storage = repo.storage_lock();
             let object_keys = StorageRepo::keys(&storage);
-            assert_eq!(object_keys.len(), threads_count);
-            for thread_number in 0..threads_count {
+            assert_eq!(object_keys.len(), THREADS_COUNT);
+            for thread_number in 0..THREADS_COUNT {
                 let object_key = format!("{}-{}", key_prefix, thread_number);
                 assert!(object_keys.contains(&object_key));
             }
         }
 
         // inserting map entires in multiple threads
-        let mut threads: Vec<_> = Vec::with_capacity(threads_count);
-        for thread_number in 0..threads_count {
+        let mut threads = Vec::with_capacity(THREADS_COUNT);
+        for thread_number in 0..THREADS_COUNT {
             let repo_cloned = repo.clone();
             let object_key = format!("{}-{}", key_prefix, thread_number);
-            let entries_count = entries_count_per_thread;
+            let entries_count = MAP_ENTRIES_PER_THREAD;
             let handler = thread::spawn(move || {
                 let mut storage = repo_cloned.storage_lock();
 
@@ -490,17 +478,17 @@ mod tests {
             threads.push(handler);
         }
 
-        // wait for completing threads
+        // wait until the finish of all the spawned threads
         for handler in threads {
             handler.join().unwrap();
         }
 
         // verify and remove map entires in multiple threads
-        let mut threads: Vec<_> = Vec::with_capacity(threads_count);
-        for thread_number in 0..threads_count {
+        let mut threads = Vec::with_capacity(THREADS_COUNT);
+        for thread_number in 0..THREADS_COUNT {
             let repo_cloned = repo.clone();
             let object_key = format!("{}-{}", key_prefix, thread_number);
-            let entries_count = entries_count_per_thread;
+            let entries_count = MAP_ENTRIES_PER_THREAD;
             let handler = thread::spawn(move || {
                 let mut storage = repo_cloned.storage_lock();
                 let mut map: HashMap<String, String> =
@@ -516,14 +504,14 @@ mod tests {
             threads.push(handler);
         }
 
-        // wait for completing threads
+        // wait until the finish of all the spawned threads
         for handler in threads {
             handler.join().unwrap();
         }
 
         // verify and remove storage items in multiple threads
-        let mut threads: Vec<_> = Vec::with_capacity(threads_count);
-        for thread_number in 0..threads_count {
+        let mut threads = Vec::with_capacity(THREADS_COUNT);
+        for thread_number in 0..THREADS_COUNT {
             let repo_cloned = repo.clone();
             let object_key = format!("{}-{}", key_prefix, thread_number);
             let handler = thread::spawn(move || {
@@ -539,12 +527,12 @@ mod tests {
             threads.push(handler);
         }
 
-        // wait for completing threads
+        // wait until the finish of all the spawned threads
         for handler in threads {
             handler.join().unwrap();
         }
 
-        // ensure that storage is empty
+        // ensure empty storage
         {
             let storage = repo.storage_lock();
             assert!(StorageRepo::keys(&storage).is_empty());
@@ -553,15 +541,12 @@ mod tests {
 
     #[test]
     fn multithread_scoped_multiobject_test() {
-        let threads_count = 100;
-        let entries_count_per_thread = 10;
-
         let key_prefix = "my_map";
         let repo = Arc::new(StorageRepo::new());
 
         // create and insert map objects into storage in multiple threads
         thread::scope(|scope| {
-            for thread_number in 0..threads_count {
+            for thread_number in 0..THREADS_COUNT {
                 let repo_cloned = repo.clone();
                 scope.spawn(move || {
                     let mut storage = repo_cloned.storage_lock();
@@ -584,8 +569,8 @@ mod tests {
         {
             let storage = repo.storage_lock();
             let object_keys = StorageRepo::keys(&storage);
-            assert_eq!(object_keys.len(), threads_count);
-            for thread_number in 0..threads_count {
+            assert_eq!(object_keys.len(), THREADS_COUNT);
+            for thread_number in 0..THREADS_COUNT {
                 let object_key = format!("{}-{}", key_prefix, thread_number);
                 assert!(object_keys.contains(&object_key));
             }
@@ -593,7 +578,7 @@ mod tests {
 
         // inserting map entires in multiple threads
         thread::scope(|scope| {
-            for thread_number in 0..threads_count {
+            for thread_number in 0..THREADS_COUNT {
                 let repo_cloned = repo.clone();
                 scope.spawn(move || {
                     let mut storage = repo_cloned.storage_lock();
@@ -602,7 +587,7 @@ mod tests {
                     let mut map: HashMap<String, String> =
                         StorageRepo::get_object(&storage, &object_key).unwrap();
 
-                    for entry_number in 0..entries_count_per_thread {
+                    for entry_number in 0..MAP_ENTRIES_PER_THREAD {
                         let entry_key = format!("{}-{}", thread_number, entry_number);
                         let entry_value = format!("{}", thread_number * entry_number);
                         map.insert(entry_key, entry_value);
@@ -615,7 +600,7 @@ mod tests {
 
         // verify and remove map entires in multiple threads
         thread::scope(|scope| {
-            for thread_number in 0..threads_count {
+            for thread_number in 0..THREADS_COUNT {
                 let repo_cloned = repo.clone();
                 scope.spawn(move || {
                     let mut storage = repo_cloned.storage_lock();
@@ -623,7 +608,7 @@ mod tests {
                     let mut map: HashMap<String, String> =
                         StorageRepo::get_object(&storage, &object_key).unwrap();
 
-                    for entry_number in 0..entries_count_per_thread {
+                    for entry_number in 0..MAP_ENTRIES_PER_THREAD {
                         let entry_key = format!("{}-{}", thread_number, entry_number);
                         let entry_value = format!("{}", thread_number * entry_number);
                         assert_eq!(map.remove(&entry_key).unwrap(), entry_value);
@@ -636,7 +621,7 @@ mod tests {
 
         // verify and remove storage items in multiple threads
         thread::scope(|scope| {
-            for thread_number in 0..threads_count {
+            for thread_number in 0..THREADS_COUNT {
                 let repo_cloned = repo.clone();
                 scope.spawn(move || {
                     let mut storage = repo_cloned.storage_lock();
@@ -651,7 +636,7 @@ mod tests {
             }
         });
 
-        // ensure storage is empty
+        // ensure empty storage
         {
             let storage = repo.storage_lock();
             assert!(StorageRepo::keys(&storage).is_empty());
