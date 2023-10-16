@@ -1,3 +1,9 @@
+use std::{
+    fs::File,
+    io::{Read, Write},
+    path::PathBuf,
+};
+
 /// Packet Type
 #[derive(Debug, Clone, Copy)]
 pub enum PacketType {
@@ -6,13 +12,13 @@ pub enum PacketType {
     StrorageItemObjectBlob = 3,
 }
 
-impl From <u8> for PacketType {
+impl From<u8> for PacketType {
     fn from(v: u8) -> Self {
         match v {
             1 => PacketType::StrorageInfo,
-            2 => PacketType::StrorageItemBlob, 
+            2 => PacketType::StrorageItemBlob,
             3 => PacketType::StrorageItemObjectBlob,
-            _ => panic!("Unmatched PacketType value {}", v) 
+            _ => panic!("Unmatched PacketType value {}", v),
         }
     }
 }
@@ -36,22 +42,22 @@ pub enum CodecType {
     CapnProto = 5,
 }
 
-impl From <u8> for CodecType {
+impl From<u8> for CodecType {
     fn from(v: u8) -> Self {
         match v {
             1 => CodecType::Bincode,
-            2 => CodecType::ProtocolBuffers, 
-            3 => CodecType::FlatBuffers, 
-            4 => CodecType::MessagePack, 
-            5 => CodecType::CapnProto, 
-            _ => panic!("Unmatched PacketType value {}", v) 
+            2 => CodecType::ProtocolBuffers,
+            3 => CodecType::FlatBuffers,
+            4 => CodecType::MessagePack,
+            5 => CodecType::CapnProto,
+            _ => panic!("Unmatched CodecType value {}", v),
         }
     }
 }
 
-pub struct Packet  {
+pub struct Packet {
     pub header: PacketHeader,
-    pub data: Vec<u8>, 
+    pub data: Vec<u8>,
 }
 
 /// Packet Header
@@ -91,15 +97,11 @@ pub struct PacketHeaderVersion02 {
 /// builds a packet
 pub fn build_packet(data: Vec<u8>, packet_type: PacketType, codec_type: CodecType) -> Packet {
     let header = build_packet_header(&data, packet_type, codec_type);
-    Packet {
-        header,
-        data
-    }
-} 
+    Packet { header, data }
+}
 
 /// parses a binary array into packet structure
 pub fn parse_packet(buf: Vec<u8>) -> Result<Packet, String> {
-
     // parse header
     let header = parse_packet_header(&buf)?;
 
@@ -107,31 +109,32 @@ pub fn parse_packet(buf: Vec<u8>) -> Result<Packet, String> {
     let mut data = buf;
     data.drain(0..PACKET_HEADER_SIZE);
 
-    let packet = Packet {
-        header,
-        data
-    };
-
-    Ok(packet)
+    Ok(Packet { header, data })
 }
 
 /// builds a packet header
-pub fn build_packet_header(data: &[u8], packet_type: PacketType, codec_type: CodecType) -> PacketHeader {
+pub fn build_packet_header(
+    data: &[u8],
+    packet_type: PacketType,
+    codec_type: CodecType,
+) -> PacketHeader {
     let packet_version = 1;
     PacketHeader {
         packet_type,
         packet_version,
         codec_type,
-        data_length: data.len() as u64
+        data_length: data.len() as u64,
     }
 }
 
 /// parses packet header
 pub fn parse_packet_header(buf: &[u8]) -> Result<PacketHeader, String> {
-
     let buf_len = buf.len();
-    if  buf_len < PACKET_HEADER_SIZE {
-        return Err(format!("Cannot parse packet header, invalid data size: {}", buf_len));
+    if buf_len < PACKET_HEADER_SIZE {
+        return Err(format!(
+            "Cannot parse packet header, invalid data size: {}",
+            buf_len
+        ));
     }
 
     let mut data_length_arr = [0_u8; 8];
@@ -141,7 +144,7 @@ pub fn parse_packet_header(buf: &[u8]) -> Result<PacketHeader, String> {
         packet_type: buf[0].into(),
         packet_version: buf[1],
         codec_type: buf[2].into(),
-        data_length: u64::from_be_bytes(data_length_arr) 
+        data_length: u64::from_be_bytes(data_length_arr),
     };
 
     Ok(header)
@@ -159,7 +162,7 @@ pub fn encode_to_binary<T: bincode::Encode>(obj: &T, codec_type: CodecType) -> O
                     None
                 }
             }
-        }        
+        }
         _ => {
             log::error!("Codec {:?} not supported yet", codec_type);
             None
@@ -182,10 +185,81 @@ pub fn decode_from_binary<T: bincode::Decode>(encoded: &[u8], codec_type: CodecT
                     None
                 }
             }
-        }        
+        }
         _ => {
             log::error!("Codec {:?} not supported yet", codec_type);
             None
         }
     }
+}
+
+/// Encodes the object and persists in file
+pub fn encode_to_file<T: bincode::Encode>(obj: &T, filepath: PathBuf) -> Result<(), String> {
+    let codec_type = CodecType::Bincode;
+    if let Some(buf) = encode_to_binary(obj, codec_type) {
+        match File::create(&filepath) {
+            Ok(mut file) => {
+                // build packet
+                let packet = build_packet(buf, PacketType::StrorageItemBlob, codec_type);
+
+                // write packet header
+                if let Err(err) = file.write_all(&packet.header.to_vec()) {
+                    return Err(format!(
+                        "Could not write into file: `{}`, Error Message: {}",
+                        filepath.to_string_lossy(),
+                        err
+                    ));
+                }
+
+                // write packet data
+                if let Err(err) = file.write_all(&packet.data) {
+                    return Err(format!(
+                        "Could not write into file: `{}`, Error Message: {}",
+                        filepath.to_string_lossy(),
+                        err
+                    ));
+                }
+            }
+            Err(err) => {
+                return Err(format!(
+                    "Could not create file: `{}`, Error Message: {}",
+                    filepath.to_string_lossy(),
+                    err
+                ));
+            }
+        }
+    } else {
+        return Err("Could not encode object!".to_string());
+    }
+    Ok(())
+}
+
+/// Loads and decodes object from file
+pub fn decode_from_file<T: bincode::Decode>(filepath: PathBuf) -> Result<T, String> {
+    if let Ok(mut file) = File::open(&filepath) {
+        let mut buf = vec![];
+        match file.read_to_end(&mut buf) {
+            Ok(_) => match parse_packet(buf) {
+                Ok(packet) => {
+                    if let Some(obj) = decode_from_binary(&packet.data, packet.header.codec_type) {
+                        return Ok(obj);
+                    }
+                }
+                Err(err) => {
+                    return Err(err);
+                }
+            },
+            Err(err) => {
+                return Err(format!(
+                    "Could not read file: `{}`, Error Message: {}",
+                    filepath.to_string_lossy(),
+                    err
+                ));
+            }
+        }
+    }
+    Err(format!(
+        "Could not open file: {}",
+        filepath.to_string_lossy()
+    ))
 }

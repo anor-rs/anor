@@ -4,7 +4,6 @@ use fs2::FileExt;
 use std::{
     collections::{HashMap, HashSet},
     fs::{self, File, FileType},
-    io::{Read, Write},
     path::PathBuf,
     sync::{Arc, Mutex, MutexGuard},
     thread,
@@ -225,77 +224,14 @@ impl StorageRepo {
         let storage_config = self.config.storage.as_ref().unwrap();
         let storage_path = storage_config.data_path.as_path();
         let filepath = storage_path.join(FILE_STORAGE_INFO);
-        if let Ok(mut file) = File::open(&filepath) {
-            let mut buf = vec![];
-            match file.read_to_end(&mut buf) {
-                Ok(_) => match parse_packet(buf) {
-                    Ok(packet) => {
-                        if let Some(storage_info) =
-                            decode_from_binary(&packet.data, packet.header.codec_type)
-                        {
-                            return Ok(storage_info);
-                        }
-                    }
-                    Err(err) => {
-                        return Err(err);
-                    }
-                },
-                Err(err) => {
-                    return Err(format!(
-                        "Could not read storage info file: `{}`, Error Message: {}",
-                        filepath.to_string_lossy(),
-                        err
-                    ));
-                }
-            }
-        }
-        Err(format!(
-            "Could not open storage info file: {}",
-            filepath.to_string_lossy()
-        ))
+        decode_from_file(filepath)
     }
 
     fn persist_storage_info(&self, storage_info: &StorageInfo) -> Result<(), String> {
         let storage_config = self.config.storage.as_ref().unwrap();
         let storage_path = storage_config.data_path.as_path();
         let filepath = storage_path.join(FILE_STORAGE_INFO);
-        let codec_type = CodecType::Bincode;
-        if let Some(buf) = encode_to_binary(storage_info, codec_type) {
-            match File::create(&filepath) {
-                Ok(mut file) => {
-                    // build packet
-                    let packet = build_packet(buf, PacketType::StrorageInfo, codec_type);
-
-                    // write packet header
-                    if let Err(err) = file.write_all(&packet.header.to_vec()) {
-                        return Err(format!(
-                            "Could not write into storage info file: `{}`, Error Message: {}",
-                            filepath.to_string_lossy(),
-                            err
-                        ));
-                    }
-
-                    // write packet data
-                    if let Err(err) = file.write_all(&packet.data) {
-                        return Err(format!(
-                            "Could not write into storage info file: `{}`, Error Message: {}",
-                            filepath.to_string_lossy(),
-                            err
-                        ));
-                    }
-                }
-                Err(err) => {
-                    return Err(format!(
-                        "Could not create storage info file `{}`, Error Message: {}",
-                        filepath.to_string_lossy(),
-                        err
-                    ));
-                }
-            }
-        } else {
-            return Err("Could not encode storage info object!".to_string());
-        }
-        Ok(())
+        encode_to_file(storage_info, filepath)
     }
 
     fn get_storage_blob_path(&self) -> PathBuf {
@@ -307,76 +243,13 @@ impl StorageRepo {
     fn persist_item(&self, item: &StorageItem) -> Result<(), String> {
         let storage_blob_path = self.get_storage_blob_path();
         let filepath = storage_blob_path.join(&item.id);
-        let codec_type = CodecType::Bincode;
-
-        if let Some(buf) = encode_to_binary(item, codec_type) {
-            match File::create(&filepath) {
-                Ok(mut file) => {
-                    // build packet
-                    let packet = build_packet(buf, PacketType::StrorageItemBlob, codec_type);
-
-                    // write packet header
-                    if let Err(err) = file.write_all(&packet.header.to_vec()) {
-                        return Err(format!(
-                            "Could not write into storage info file: `{}`, Error Message: {}",
-                            filepath.to_string_lossy(),
-                            err
-                        ));
-                    }
-
-                    // write packet data
-                    if let Err(err) = file.write_all(&packet.data) {
-                        return Err(format!(
-                            "Could not write into storage item file, key: {}, id: {}, Error Message: {}",
-                            item.key, item.id, err
-                        ));
-                    }
-                }
-                Err(err) => {
-                    return Err(format!(
-                        "Could not create storage item file, key: {}, id: {}, Error Message: {}",
-                        item.key, item.id, err
-                    ));
-                }
-            }
-        } else {
-            return Err(format!("Could not encode storage item {}!", item.id));
-        }
-        Ok(())
+        encode_to_file(item, filepath)
     }
 
     fn load_item(&self, item_id: String) -> Result<StorageItem, String> {
         let storage_blob_path = self.get_storage_blob_path();
-        let filepath = storage_blob_path.join(&item_id);
-
-        if let Ok(mut file) = File::open(&filepath) {
-            let mut buf = vec![];
-            match file.read_to_end(&mut buf) {
-                Ok(_) => match parse_packet(buf) {
-                    Ok(packet) => {
-                        if let Some(storage_item) =
-                            decode_from_binary(&packet.data, packet.header.codec_type)
-                        {
-                            return Ok(storage_item);
-                        }
-                    }
-                    Err(err) => {
-                        return Err(err);
-                    }
-                },
-                Err(err) => {
-                    return Err(format!(
-                        "Could not read storage item file: `{}`, Error Message: {}",
-                        filepath.to_string_lossy(),
-                        err
-                    ));
-                }
-            }
-        }
-        Err(format!(
-            "Could not open storage item file: {}",
-            filepath.to_string_lossy()
-        ))
+        let filepath = storage_blob_path.join(item_id);
+        decode_from_file(filepath)
     }
 
     /// Unlocks the storage
