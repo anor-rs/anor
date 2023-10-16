@@ -1,5 +1,9 @@
 # anor configuration file
 
+# storage settings
+storage:
+  data_path: "/tmp/anor"
+
 # server node settings
 server:
   name: anor1
@@ -12,7 +16,6 @@ server:
   threads_max: 4
   ram_max: 512M
   disk_max: 2G
-  disk_root: "/var/anor"
 
 file_server:
   listen_addresses: 127.0.0.1

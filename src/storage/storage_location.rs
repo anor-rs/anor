@@ -1,5 +1,5 @@
 /// Storage type
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
 pub enum StorageLocation {
     /// Store in memory
     Memory,

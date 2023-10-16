@@ -1,17 +1,20 @@
-use super::{storage_location::StorageLocation, storage_type::StorageType};
+use super::{storage_codec::*, storage_location::StorageLocation, storage_type::StorageType};
 use std::collections::HashMap;
+use uuid::Uuid;
 
 /// Storage Item
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
 pub struct StorageItem {
+    pub id: String,
     pub key: String,
+    pub version: u64,
     pub description: Option<String>,
     pub storage_type: StorageType,
     pub data: Vec<u8>,
     pub tags: Option<Vec<String>>,
     pub metadata: Option<HashMap<String, String>>,
     pub may_expire: bool,
-    pub expires_on: Option<std::time::Instant>,
+    pub expires_on: Option<String>,
     pub storage_locations: Vec<StorageLocation>,
 
     /// defines the number of required replications in the cluster
@@ -20,8 +23,10 @@ pub struct StorageItem {
 
 impl StorageItem {
     pub fn new<T: bincode::Encode>(key: &str, storage_type: StorageType, obj: &T) -> Option<Self> {
-        Self::binary_encode(obj).map(|data| StorageItem {
+        encode_to_binary(obj, CodecType::Bincode).map(|data| StorageItem {
+            id: Uuid::new_v4().to_string(),
             key: key.to_owned(),
+            version: 0,
             description: None,
             storage_type,
             storage_locations: vec![StorageLocation::Memory],
@@ -34,19 +39,8 @@ impl StorageItem {
         })
     }
 
-    fn binary_encode<T: bincode::Encode>(obj: &T) -> Option<Vec<u8>> {
-        let bincode_config = bincode::config::standard();
-        match bincode::encode_to_vec(obj, bincode_config) {
-            Ok(arr) => Some(arr),
-            Err(msg) => {
-                log::error!("Object to Binary encode error: {}", msg.to_string());
-                None
-            }
-        }
-    }
-
     pub fn update_object<T: bincode::Encode>(&mut self, obj: &T) -> bool {
-        if let Some(encoded) = Self::binary_encode(obj) {
+        if let Some(encoded) = encode_to_binary(obj, CodecType::Bincode) {
             self.data = encoded;
             return true;
         }
@@ -54,16 +48,6 @@ impl StorageItem {
     }
 
     pub fn get_object<T: bincode::Decode>(&self) -> Option<T> {
-        let bincode_config = bincode::config::standard();
-        match bincode::decode_from_slice(&self.data, bincode_config) {
-            Ok(r) => {
-                let (decoded, _len): (T, usize) = r;
-                Some(decoded)
-            }
-            Err(msg) => {
-                log::error!("Binary to Object decode error: {}", msg.to_string());
-                None
-            }
-        }
+        decode_from_binary(&self.data, CodecType::Bincode)
     }
 }

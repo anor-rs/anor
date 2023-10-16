@@ -1,12 +1,12 @@
 /// Generic Type
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
 pub enum StorageType {
     Basic(BasicType),
     Complex(ComplexType),
 }
 
 /// Basic Type
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
 pub enum BasicType {
     String,
     Boolean,
@@ -16,7 +16,7 @@ pub enum BasicType {
 }
 
 /// Complex Type
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, bincode::Encode, bincode::Decode)]
 pub enum ComplexType {
     Array(BasicType),
     Set(BasicType),
