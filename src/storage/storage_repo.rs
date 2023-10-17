@@ -5,8 +5,8 @@ use std::{
     collections::{HashMap, HashSet},
     fs::{self, File, FileType},
     path::PathBuf,
-    sync::{Arc, Mutex, MutexGuard},
-    thread,
+    sync::{Arc, Mutex, MutexGuard, RwLock, RwLockReadGuard},
+    thread::{self, ThreadId},
     time::Duration,
 };
 
@@ -14,13 +14,95 @@ pub struct StorageRepo {
     storage: Storage,
     config: Arc<utils::config::Config>,
     lock: File,
-    saved: bool,
+    global_lock: Mutex<()>,
+    global_lock_thread: RwLock<Option<ThreadId>>,
+    // saved: bool,
 }
 
 type Storage = Arc<Mutex<StorageMap>>;
 type StorageMap = HashMap<String, StorageItem>;
 
 type StorageInfo = HashMap<String, (String, u64)>;
+
+struct GlobalStorageLock<'a> {
+    storage_repo: &'a StorageRepo,
+    guard: Option<MutexGuard<'a, ()>>,
+}
+
+impl Drop for GlobalStorageLock<'_> {
+    fn drop(&mut self) {
+        self.unlock();
+    }
+}
+impl GlobalStorageLock<'_> {
+    /// Returns an exclusive access to the storage operations
+    pub fn lock(storage_repo: &StorageRepo) -> GlobalStorageLock {
+        let guard = Self::guard_global_lock(storage_repo);
+        Self::set_global_lock_thread_id(storage_repo, Some(thread::current().id()));
+        GlobalStorageLock {
+            storage_repo,
+            guard: Some(guard),
+        }
+    }
+
+    /// Unlocks the exclusive access to the storage
+    pub fn unlock(&mut self) {
+        Self::set_global_lock_thread_id(self.storage_repo, None);
+        self.guard = None;
+    }
+
+    fn guard_global_lock(storage_repo: &StorageRepo) -> MutexGuard<()> {
+        match storage_repo.global_lock.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => {
+                // handle poisoned RwLock
+                let guard = poisoned.into_inner();
+                if log::log_enabled!(log::Level::Warn) {
+                    log::warn!(
+                        "RwLock `transaction_lock` recovered from poisoning: {:?}",
+                        *guard
+                    );
+                }
+                guard
+            }
+        }
+    }
+
+    fn read_guard_thread_id(storage_repo: &StorageRepo) -> RwLockReadGuard<Option<ThreadId>> {
+        match storage_repo.global_lock_thread.read() {
+            Ok(guard) => guard,
+            Err(poisoned) => {
+                // handle poisoned mutex
+                let guard = poisoned.into_inner();
+                if log::log_enabled!(log::Level::Warn) {
+                    log::warn!(
+                        "RwLock `global_lock_thread_id` recovered from poisoning: {:?}",
+                        *guard
+                    );
+                }
+                guard
+            }
+        }
+    }
+
+    fn set_global_lock_thread_id(storage_repo: &StorageRepo, option: Option<ThreadId>) {
+        let mut guard = match storage_repo.global_lock_thread.write() {
+            Ok(guard) => guard,
+            Err(poisoned) => {
+                // handle poisoned mutex
+                let guard = poisoned.into_inner();
+                if log::log_enabled!(log::Level::Warn) {
+                    log::warn!(
+                        "RwLock `global_lock_thread_id` recovered from poisoning: {:?}",
+                        *guard
+                    );
+                }
+                guard
+            }
+        };
+        *guard = option;
+    }
+}
 
 impl Default for StorageRepo {
     fn default() -> Self {
@@ -101,14 +183,16 @@ impl StorageRepo {
             storage: Arc::new(Mutex::new(HashMap::new())),
             config,
             lock,
-            saved: true,
+            global_lock: Mutex::new(()),
+            global_lock_thread: RwLock::new(None),
+            // saved: true,
         }
     }
 
     /// Loads the persisted data into storage
     pub fn load(&mut self) -> Result<(), String> {
-        let mut storage = self.storage_lock();
-        StorageRepo::clear(&mut storage);
+        let mut g_lock = GlobalStorageLock::lock(self);
+        self.clear();
 
         // load storage info
         match self.load_storage_info() {
@@ -118,7 +202,7 @@ impl StorageRepo {
                     match self.load_item(item_id.clone()) {
                         Ok(storage_item) => {
                             // insert loaded item into storage
-                            StorageRepo::insert(&mut storage, storage_item)
+                            self.insert(storage_item)
                         }
                         Err(err) => {
                             log::error!("{}", err);
@@ -131,12 +215,13 @@ impl StorageRepo {
                 log::error!("{}", err);
             }
         };
+        g_lock.unlock();
         Ok(())
     }
 
     /// Persists the storage data
     pub fn flush(&mut self) -> Result<(), String> {
-        let storage = self.storage_lock();
+        let mut g_lock = GlobalStorageLock::lock(self);
 
         // load locally persisted storage info
         let persisted_info = match self.load_storage_info() {
@@ -148,8 +233,8 @@ impl StorageRepo {
         };
 
         let mut info_to_persist: StorageInfo = HashMap::new();
-        for key in Self::object_keys(&storage) {
-            if let Some(item) = Self::get(&storage, &key) {
+        for key in self.object_keys() {
+            if let Some(item) = self.get(&key.clone()) {
                 info_to_persist.insert(key, (item.id.clone(), item.version));
             }
         }
@@ -194,7 +279,7 @@ impl StorageRepo {
         }
 
         for (item_key, (item_id, item_version)) in info_to_persist {
-            if let Some(item) = Self::get(&storage, &item_key) {
+            if let Some(item) = self.get(&item_key) {
                 // check if item is replaced or updated
                 let needs_persist = if let Some(prev) = &persisted_info {
                     if let Some((prev_id, prev_version)) = prev.get(&item.key) {
@@ -210,13 +295,14 @@ impl StorageRepo {
                 };
 
                 if needs_persist {
-                    if let Err(err) = self.persist_item(item) {
+                    if let Err(err) = self.persist_item(&item) {
                         log::error!("{}", err);
                         return Err(err);
                     }
                 }
             }
         }
+        g_lock.unlock();
         Ok(())
     }
 
@@ -267,15 +353,32 @@ impl StorageRepo {
         self.unlock();
     }
 
-    /// Locks and returns a guarded access to the storage map
-    pub fn storage_lock(&self) -> MutexGuard<StorageMap> {
+    /// Returns a guarded lock to access to the storage operations
+    fn lock(&self) -> MutexGuard<StorageMap> {
+        // when global locked, only locked thread should have access to storage operations
+        // other threads need to wait until global lock released
+
+        let wait_for_global_lock_release = {
+            // RwLockReadGuard needs to drop before obtaining a global lock to avoid deadlocks
+            let read_guard = GlobalStorageLock::read_guard_thread_id(self);
+            if let Some(global_lock_thread_id) = read_guard.to_owned() {
+                global_lock_thread_id != thread::current().id()
+            } else {
+                false
+            }
+        };
+
+        if wait_for_global_lock_release {
+            GlobalStorageLock::lock(self).unlock();
+        }
+
         match self.storage.lock() {
             Ok(guard) => guard,
             Err(poisoned) => {
                 // handle poisoned mutex
                 let guard = poisoned.into_inner();
                 if log::log_enabled!(log::Level::Warn) {
-                    log::warn!("Mutex recovered from poisoning: {:?}", *guard);
+                    log::warn!("Mutex `storage` recovered from poisoning: {:?}", *guard);
                 }
                 guard
             }
@@ -284,44 +387,33 @@ impl StorageRepo {
 
     /// Inserts an item into the storage.
     /// If the storage did have an item with the key present, the item is updated.
-    pub fn insert(storage: &mut MutexGuard<StorageMap>, storage_item: StorageItem) {
-        storage.insert(storage_item.key.clone(), storage_item);
+    pub fn insert(&self, storage_item: StorageItem) {
+        self.lock().insert(storage_item.key.clone(), storage_item);
     }
 
     /// Gets an item from the storage corresponding to the key
-    pub fn get<'a>(storage: &'a MutexGuard<StorageMap>, key: &str) -> Option<&'a StorageItem> {
-        storage.get(key)
-    }
-
-    /// Gets a mutable item from the storage corresponding to the key
-    pub fn get_mut<'a>(
-        storage: &'a mut MutexGuard<StorageMap>,
-        key: &str,
-    ) -> Option<&'a mut StorageItem> {
-        storage.get_mut(key)
+    pub fn get(&self, key: &str) -> Option<StorageItem> {
+        self.lock().get(key).cloned()
     }
 
     /// Removes an item from the storage
-    pub fn remove(storage: &mut MutexGuard<StorageMap>, key: &str) {
-        storage.remove(key);
+    pub fn remove(&self, key: &str) {
+        self.lock().remove(key);
     }
 
     /// Clears the storage, removing all items
-    pub fn clear(storage: &mut MutexGuard<StorageMap>) {
-        storage.clear();
+    pub fn clear(&self) {
+        self.lock().clear();
     }
 
     /// Returns the stored object keys
-    pub fn object_keys(storage: &MutexGuard<StorageMap>) -> Vec<String> {
-        storage.keys().cloned().collect()
+    pub fn object_keys(&self) -> Vec<String> {
+        self.lock().keys().cloned().collect()
     }
 
     /// Returns an object of the item corresponding to the key
-    pub fn get_object<T: bincode::Decode>(
-        storage: &MutexGuard<StorageMap>,
-        key: &str,
-    ) -> Option<T> {
-        if let Some(item) = StorageRepo::get(storage, key) {
+    pub fn get_object<T: bincode::Decode>(&self, key: &str) -> Option<T> {
+        if let Some(item) = self.get(key) {
             let object: Option<T> = item.get_object();
             return object;
         }
@@ -329,12 +421,9 @@ impl StorageRepo {
     }
 
     /// Updates the object of the item corresponding to the key
-    pub fn update_object<T: bincode::Encode>(
-        storage: &mut MutexGuard<StorageMap>,
-        key: &str,
-        obj: &T,
-    ) -> bool {
-        if let Some(item) = StorageRepo::get_mut(storage, key) {
+    pub fn update_object<T: bincode::Encode>(&self, key: &str, obj: &T) -> bool {
+        let mut guard = self.lock();
+        if let Some(item) = guard.get_mut(key) {
             item.update_object(obj);
             return true;
         }
@@ -366,46 +455,42 @@ mod tests {
     }
 
     #[test]
-    pub fn storage_open_test() {
+    fn storage_open_test() {
         let repo = StorageRepo::open_with_config(get_test_config());
-        let mut storage = repo.storage_lock();
 
         // clean up the storage
-        StorageRepo::clear(&mut storage);
-
-        assert!(StorageRepo::object_keys(&storage).is_empty());
+        repo.clear();
+        assert!(repo.object_keys().is_empty());
     }
 
     #[test]
-    pub fn storage_insert_test() {
+    fn storage_insert_test() {
         let repo = StorageRepo::open_with_config(get_test_config());
-        let mut storage = repo.storage_lock();
 
         // clean up the storage
-        StorageRepo::clear(&mut storage);
+        repo.clear();
 
         let key = "my_string1";
         let my_string = String::from("abc1");
         let storage_item =
             StorageItem::new(key, StorageType::Basic(BasicType::String), &my_string).unwrap();
 
-        StorageRepo::insert(&mut storage, storage_item);
+        repo.insert(storage_item);
 
-        let keys = StorageRepo::object_keys(&storage);
+        let keys = repo.object_keys();
         assert_eq!(keys.len(), 1);
         assert_eq!(keys[0], key);
 
         // clean up the storage
-        StorageRepo::clear(&mut storage);
+        repo.clear();
     }
 
     #[test]
-    pub fn storage_update_test() {
+    fn storage_update_test() {
         let repo = StorageRepo::open_with_config(get_test_config());
-        let mut storage = repo.storage_lock();
 
         // clean up the storage
-        StorageRepo::clear(&mut storage);
+        repo.clear();
 
         let key = "my_string2";
         let my_string = String::from("abc2");
@@ -413,76 +498,72 @@ mod tests {
             StorageItem::new(key, StorageType::Basic(BasicType::String), &my_string).unwrap();
         storage_item.description = Some("abc".to_string());
 
-        StorageRepo::insert(&mut storage, storage_item);
+        repo.insert(storage_item);
 
-        assert_eq!(StorageRepo::object_keys(&storage).len(), 1);
-        let item = StorageRepo::get_mut(&mut storage, key).unwrap();
-        assert_eq!(item.description, Some("abc".to_string()));
+        assert_eq!(repo.object_keys().len(), 1);
+        {
+            let mut guard = repo.lock();
+            let item = guard.get_mut(key).unwrap();
+            assert_eq!(item.description, Some("abc".to_string()));
+            item.description = Some("abcd".to_string());
+        }
 
-        item.description = Some("abcd".to_string());
-
-        assert_eq!(
-            StorageRepo::get(&storage, key).unwrap().description,
-            Some("abcd".to_string())
-        );
+        assert_eq!(repo.get(key).unwrap().description, Some("abcd".to_string()));
 
         // clean up the storage
-        StorageRepo::clear(&mut storage);
+        repo.clear();
     }
 
     #[test]
-    pub fn storage_remove_test() {
+    fn storage_remove_test() {
         let repo = StorageRepo::open_with_config(get_test_config());
-        let mut storage = repo.storage_lock();
 
         // clean up the storage
-        StorageRepo::clear(&mut storage);
+        repo.clear();
 
         let key = "my_string3";
         let my_string = String::from("abc3");
         let storage_item =
             StorageItem::new(key, StorageType::Basic(BasicType::String), &my_string).unwrap();
 
-        StorageRepo::insert(&mut storage, storage_item);
+        repo.insert(storage_item);
 
-        let keys = StorageRepo::object_keys(&storage);
+        let keys = repo.object_keys();
         assert_eq!(keys.len(), 1);
         assert_eq!(keys[0], key);
 
-        StorageRepo::remove(&mut storage, key);
-        assert!(StorageRepo::object_keys(&storage).is_empty());
+        repo.remove(key);
+        assert!(repo.object_keys().is_empty());
     }
 
     #[test]
-    pub fn storage_clear_test() {
+    fn storage_clear_test() {
         let repo = StorageRepo::open_with_config(get_test_config());
-        let mut storage = repo.storage_lock();
 
         // clean up the storage
-        StorageRepo::clear(&mut storage);
+        repo.clear();
 
         let key = "my_string4";
         let my_string = String::from("abc4");
         let storage_item =
             StorageItem::new(key, StorageType::Basic(BasicType::String), &my_string).unwrap();
 
-        StorageRepo::insert(&mut storage, storage_item);
+        repo.insert(storage_item);
 
-        let keys = StorageRepo::object_keys(&storage);
+        let keys = repo.object_keys();
         assert_eq!(keys.len(), 1);
         assert_eq!(keys[0], key);
 
-        StorageRepo::clear(&mut storage);
-        assert!(StorageRepo::object_keys(&storage).is_empty());
+        repo.clear();
+        assert!(repo.object_keys().is_empty());
     }
 
     #[test]
-    pub fn storage_object_test() {
+    fn storage_object_test() {
         let repo = StorageRepo::open_with_config(get_test_config());
-        let mut storage = repo.storage_lock();
 
         // clean up the storage
-        StorageRepo::clear(&mut storage);
+        repo.clear();
 
         let key = "my_map1";
 
@@ -495,43 +576,37 @@ mod tests {
             StorageType::Complex(ComplexType::Map(BasicType::String, BasicType::String));
         let storage_item = StorageItem::new(key, storage_type, &my_map1).unwrap();
 
-        StorageRepo::insert(&mut storage, storage_item);
+        repo.insert(storage_item);
 
-        let decoded_map1: HashMap<String, String> = StorageRepo::get_object(&storage, key).unwrap();
+        let decoded_map1: HashMap<String, String> = repo.get_object(key).unwrap();
         assert_eq!(my_map1, decoded_map1);
 
         my_map1.insert("4".into(), "Four".into());
-        assert!(StorageRepo::update_object(&mut storage, key, &my_map1));
+        assert!(repo.update_object(key, &my_map1));
 
-        let decoded_map2 =
-            StorageRepo::get_object::<HashMap<String, String>>(&storage, key).unwrap();
+        let decoded_map2 = repo.get_object::<HashMap<String, String>>(key).unwrap();
         assert_eq!(my_map1, decoded_map2);
 
         // clean up the storage
-        StorageRepo::clear(&mut storage);
+        repo.clear();
     }
 
     #[test]
     fn multithread_map_insert_test() {
         let key = "my_map";
         let repo = Arc::new(StorageRepo::open_with_config(get_test_config()));
-        {
-            // clean up the storage
-            let mut storage = repo.storage_lock();
-            StorageRepo::clear(&mut storage);
-        }
+
+        // clean up the storage
+        repo.clear();
 
         // create a new map and insert into storage
-        {
-            let my_map = HashMap::<String, String>::new();
+        let my_map = HashMap::<String, String>::new();
 
-            let storage_type =
-                StorageType::Complex(ComplexType::Map(BasicType::String, BasicType::String));
-            let storage_item = StorageItem::new(key, storage_type, &my_map).unwrap();
+        let storage_type =
+            StorageType::Complex(ComplexType::Map(BasicType::String, BasicType::String));
+        let storage_item = StorageItem::new(key, storage_type, &my_map).unwrap();
 
-            let mut storage = repo.storage_lock();
-            StorageRepo::insert(&mut storage, storage_item);
-        }
+        repo.insert(storage_item);
 
         // inserting map entires in multiple threads
         let mut threads = Vec::with_capacity(THREADS_COUNT);
@@ -539,15 +614,15 @@ mod tests {
             let repo_cloned = repo.clone();
             let entries_count = MAP_ENTRIES_PER_THREAD;
             let handler = thread::spawn(move || {
-                let mut storage = repo_cloned.storage_lock();
-                let mut map: HashMap<String, String> =
-                    StorageRepo::get_object(&storage, key).unwrap();
+                let mut g_lock = GlobalStorageLock::lock(&repo_cloned);
+                let mut map: HashMap<String, String> = repo_cloned.get_object(key).unwrap();
                 for entry_number in 0..entries_count {
                     let entry_key = format!("{}-{}", thread_number, entry_number);
                     let entry_value = format!("{}", thread_number * entry_number);
                     map.insert(entry_key, entry_value);
                 }
-                StorageRepo::update_object(&mut storage, key, &map);
+                repo_cloned.update_object(key, &map);
+                g_lock.unlock();
                 thread::sleep(Duration::from_millis(1));
             });
             threads.push(handler);
@@ -559,55 +634,44 @@ mod tests {
         }
 
         // verify entries
-        {
-            let storage = repo.storage_lock();
-            let map = StorageRepo::get_object::<HashMap<String, String>>(&storage, key).unwrap();
-            assert_eq!(map.keys().count(), THREADS_COUNT * MAP_ENTRIES_PER_THREAD);
-            for thread_number in 0..THREADS_COUNT {
-                for entry_number in 0..MAP_ENTRIES_PER_THREAD {
-                    let entry_key = format!("{}-{}", thread_number, entry_number);
-                    let entry_value = format!("{}", thread_number * entry_number);
-                    assert_eq!(map.get(&entry_key).unwrap(), &entry_value);
-                }
+        let map = repo.get_object::<HashMap<String, String>>(key).unwrap();
+        assert_eq!(map.keys().count(), THREADS_COUNT * MAP_ENTRIES_PER_THREAD);
+        for thread_number in 0..THREADS_COUNT {
+            for entry_number in 0..MAP_ENTRIES_PER_THREAD {
+                let entry_key = format!("{}-{}", thread_number, entry_number);
+                let entry_value = format!("{}", thread_number * entry_number);
+                assert_eq!(map.get(&entry_key).unwrap(), &entry_value);
             }
         }
 
-        {
-            // clean up the storage
-            let mut storage = repo.storage_lock();
-            StorageRepo::clear(&mut storage);
-        }
+        // clean up the storage
+        repo.clear();
     }
 
     #[test]
     fn multithread_map_get_test() {
-        let key = "my_map";
         let repo = Arc::new(StorageRepo::open_with_config(get_test_config()));
-        {
-            // clean up the storage
-            let mut storage = repo.storage_lock();
-            StorageRepo::clear(&mut storage);
-        }
+
+        // clean up the storage
+        repo.clear();
 
         // create a new map and insert entries
-        {
-            let mut my_map = HashMap::<String, String>::new();
+        let key = "my_map";
+        let mut my_map = HashMap::<String, String>::new();
 
-            for thread_number in 0..THREADS_COUNT {
-                for entry_number in 0..MAP_ENTRIES_PER_THREAD {
-                    let entry_key = format!("{}-{}", thread_number, entry_number);
-                    let entry_value = format!("{}", thread_number * entry_number);
-                    my_map.insert(entry_key, entry_value);
-                }
+        for thread_number in 0..THREADS_COUNT {
+            for entry_number in 0..MAP_ENTRIES_PER_THREAD {
+                let entry_key = format!("{}-{}", thread_number, entry_number);
+                let entry_value = format!("{}", thread_number * entry_number);
+                my_map.insert(entry_key, entry_value);
             }
-
-            let storage_type =
-                StorageType::Complex(ComplexType::Map(BasicType::String, BasicType::String));
-            let storage_item = StorageItem::new(key, storage_type, &my_map).unwrap();
-
-            let mut storage = repo.storage_lock();
-            StorageRepo::insert(&mut storage, storage_item);
         }
+
+        let storage_type =
+            StorageType::Complex(ComplexType::Map(BasicType::String, BasicType::String));
+        let storage_item = StorageItem::new(key, storage_type, &my_map).unwrap();
+
+        repo.insert(storage_item);
 
         // get map entires in multiple threads
         let mut threads = Vec::with_capacity(THREADS_COUNT);
@@ -615,14 +679,13 @@ mod tests {
             let repo_cloned = repo.clone();
             let entries_count = MAP_ENTRIES_PER_THREAD;
             let handler = thread::spawn(move || {
-                let mut storage = repo_cloned.storage_lock();
-                let map: HashMap<String, String> = StorageRepo::get_object(&storage, key).unwrap();
+                let map: HashMap<String, String> = repo_cloned.get_object(key).unwrap();
                 for entry_number in 0..entries_count {
                     let entry_key = format!("{}-{}", thread_number, entry_number);
                     let entry_value = format!("{}", thread_number * entry_number);
                     assert_eq!(map.get(&entry_key).unwrap(), &entry_value);
                 }
-                StorageRepo::update_object(&mut storage, key, &map);
+                repo_cloned.update_object(key, &map);
                 thread::sleep(Duration::from_millis(1));
             });
             threads.push(handler);
@@ -634,45 +697,37 @@ mod tests {
         }
 
         // check entries count
-        {
-            let mut storage = repo.storage_lock();
-            let map = StorageRepo::get_object::<HashMap<String, String>>(&storage, key).unwrap();
-            assert_eq!(map.keys().count(), THREADS_COUNT * MAP_ENTRIES_PER_THREAD);
+        let map = repo.get_object::<HashMap<String, String>>(key).unwrap();
+        assert_eq!(map.keys().count(), THREADS_COUNT * MAP_ENTRIES_PER_THREAD);
 
-            // clean up the storage
-            StorageRepo::clear(&mut storage);
-        }
+        // clean up the storage
+        repo.clear();
     }
 
     #[test]
     fn multithread_map_remove_test() {
-        let key = "my_map";
         let repo = Arc::new(StorageRepo::open_with_config(get_test_config()));
-        {
-            // clean up the storage
-            let mut storage = repo.storage_lock();
-            StorageRepo::clear(&mut storage);
-        }
+
+        // clean up the storage
+        repo.clear();
 
         // create a new map and insert entries
-        {
-            let mut my_map = HashMap::<String, String>::new();
+        let key = "my_map";
+        let mut my_map = HashMap::<String, String>::new();
 
-            for thread_number in 0..THREADS_COUNT {
-                for entry_number in 0..MAP_ENTRIES_PER_THREAD {
-                    let entry_key = format!("{}-{}", thread_number, entry_number);
-                    let entry_value = format!("{}", thread_number * entry_number);
-                    my_map.insert(entry_key, entry_value);
-                }
+        for thread_number in 0..THREADS_COUNT {
+            for entry_number in 0..MAP_ENTRIES_PER_THREAD {
+                let entry_key = format!("{}-{}", thread_number, entry_number);
+                let entry_value = format!("{}", thread_number * entry_number);
+                my_map.insert(entry_key, entry_value);
             }
-
-            let storage_type =
-                StorageType::Complex(ComplexType::Map(BasicType::String, BasicType::String));
-            let storage_item = StorageItem::new(key, storage_type, &my_map).unwrap();
-
-            let mut storage = repo.storage_lock();
-            StorageRepo::insert(&mut storage, storage_item);
         }
+
+        let storage_type =
+            StorageType::Complex(ComplexType::Map(BasicType::String, BasicType::String));
+        let storage_item = StorageItem::new(key, storage_type, &my_map).unwrap();
+
+        repo.insert(storage_item);
 
         // verify and remove map entires in multiple threads
         let mut threads = Vec::with_capacity(THREADS_COUNT);
@@ -680,15 +735,15 @@ mod tests {
             let repo_cloned = repo.clone();
             let entries_count = MAP_ENTRIES_PER_THREAD;
             let handler = thread::spawn(move || {
-                let mut storage = repo_cloned.storage_lock();
-                let mut map: HashMap<String, String> =
-                    StorageRepo::get_object(&storage, key).unwrap();
+                let mut g_lock = GlobalStorageLock::lock(&repo_cloned);
+                let mut map: HashMap<String, String> = repo_cloned.get_object(key).unwrap();
                 for entry_number in 0..entries_count {
                     let entry_key = format!("{}-{}", thread_number, entry_number);
                     let entry_value = format!("{}", thread_number * entry_number);
                     assert_eq!(map.remove(&entry_key).unwrap(), entry_value);
                 }
-                StorageRepo::update_object(&mut storage, key, &map);
+                repo_cloned.update_object(key, &map);
+                g_lock.unlock();
                 thread::sleep(Duration::from_millis(1));
             });
             threads.push(handler);
@@ -700,22 +755,18 @@ mod tests {
         }
 
         // ensure the map is empty
-        {
-            let storage = repo.storage_lock();
-            let map = StorageRepo::get_object::<HashMap<String, String>>(&storage, key).unwrap();
-            assert!(map.is_empty());
-        }
+        let map = repo.get_object::<HashMap<String, String>>(key).unwrap();
+        assert!(map.is_empty());
     }
 
     #[test]
     fn multithread_multiobject_test() {
-        let key_prefix = "my_map";
         let repo = Arc::new(StorageRepo::open_with_config(get_test_config()));
-        {
-            // clean up the storage
-            let mut storage = repo.storage_lock();
-            StorageRepo::clear(&mut storage);
-        }
+
+        // clean up the storage
+        repo.clear();
+
+        let key_prefix = "my_map";
 
         // creating and inserting map objects in multiple threads
         let mut threads = Vec::with_capacity(THREADS_COUNT);
@@ -723,14 +774,12 @@ mod tests {
             let repo_cloned = repo.clone();
             let object_key = format!("{}-{}", key_prefix, thread_number);
             let handler = thread::spawn(move || {
-                let mut storage = repo_cloned.storage_lock();
-
                 let map = HashMap::<String, String>::new();
                 let storage_type =
                     StorageType::Complex(ComplexType::Map(BasicType::String, BasicType::String));
                 let storage_item = StorageItem::new(&object_key, storage_type, &map).unwrap();
 
-                StorageRepo::insert(&mut storage, storage_item);
+                repo_cloned.insert(storage_item);
                 thread::sleep(Duration::from_millis(1));
             });
             threads.push(handler);
@@ -742,14 +791,11 @@ mod tests {
         }
 
         // verify inserted objects
-        {
-            let storage = repo.storage_lock();
-            let object_keys = StorageRepo::object_keys(&storage);
-            assert_eq!(object_keys.len(), THREADS_COUNT);
-            for thread_number in 0..THREADS_COUNT {
-                let object_key = format!("{}-{}", key_prefix, thread_number);
-                assert!(object_keys.contains(&object_key));
-            }
+        let object_keys = repo.object_keys();
+        assert_eq!(object_keys.len(), THREADS_COUNT);
+        for thread_number in 0..THREADS_COUNT {
+            let object_key = format!("{}-{}", key_prefix, thread_number);
+            assert!(object_keys.contains(&object_key));
         }
 
         // inserting map entires in multiple threads
@@ -759,16 +805,13 @@ mod tests {
             let object_key = format!("{}-{}", key_prefix, thread_number);
             let entries_count = MAP_ENTRIES_PER_THREAD;
             let handler = thread::spawn(move || {
-                let mut storage = repo_cloned.storage_lock();
-
-                let mut map: HashMap<String, String> =
-                    StorageRepo::get_object(&storage, &object_key).unwrap();
+                let mut map: HashMap<String, String> = repo_cloned.get_object(&object_key).unwrap();
                 for entry_number in 0..entries_count {
                     let entry_key = format!("{}-{}", thread_number, entry_number);
                     let entry_value = format!("{}", thread_number * entry_number);
                     map.insert(entry_key, entry_value);
                 }
-                StorageRepo::update_object(&mut storage, &object_key, &map);
+                repo_cloned.update_object(&object_key, &map);
                 thread::sleep(Duration::from_millis(1));
             });
             threads.push(handler);
@@ -786,15 +829,13 @@ mod tests {
             let object_key = format!("{}-{}", key_prefix, thread_number);
             let entries_count = MAP_ENTRIES_PER_THREAD;
             let handler = thread::spawn(move || {
-                let mut storage = repo_cloned.storage_lock();
-                let mut map: HashMap<String, String> =
-                    StorageRepo::get_object(&storage, &object_key).unwrap();
+                let mut map: HashMap<String, String> = repo_cloned.get_object(&object_key).unwrap();
                 for entry_number in 0..entries_count {
                     let entry_key = format!("{}-{}", thread_number, entry_number);
                     let entry_value = format!("{}", thread_number * entry_number);
                     assert_eq!(map.remove(&entry_key).unwrap(), entry_value);
                 }
-                StorageRepo::update_object(&mut storage, &object_key, &map);
+                repo_cloned.update_object(&object_key, &map);
                 thread::sleep(Duration::from_millis(1));
             });
             threads.push(handler);
@@ -811,13 +852,11 @@ mod tests {
             let repo_cloned = repo.clone();
             let object_key = format!("{}-{}", key_prefix, thread_number);
             let handler = thread::spawn(move || {
-                let mut storage = repo_cloned.storage_lock();
-                let map: HashMap<String, String> =
-                    StorageRepo::get_object(&storage, &object_key).unwrap();
+                let map: HashMap<String, String> = repo_cloned.get_object(&object_key).unwrap();
                 assert!(map.is_empty());
 
                 // remove storage object
-                StorageRepo::remove(&mut storage, &object_key);
+                repo_cloned.remove(&object_key);
                 thread::sleep(Duration::from_millis(1));
             });
             threads.push(handler);
@@ -829,29 +868,23 @@ mod tests {
         }
 
         // ensure empty storage
-        {
-            let storage = repo.storage_lock();
-            assert!(StorageRepo::object_keys(&storage).is_empty());
-        }
+        assert!(repo.object_keys().is_empty());
     }
 
     #[test]
     fn multithread_scoped_multiobject_test() {
-        let key_prefix = "my_map";
         let repo = Arc::new(StorageRepo::open_with_config(get_test_config()));
-        {
-            // clean up the storage
-            let mut storage = repo.storage_lock();
-            StorageRepo::clear(&mut storage);
-        }
+
+        // clean up the storage
+        repo.clear();
+
+        let key_prefix = "my_map";
 
         // create and insert map objects into storage in multiple threads
         thread::scope(|scope| {
             for thread_number in 0..THREADS_COUNT {
                 let repo_cloned = repo.clone();
                 scope.spawn(move || {
-                    let mut storage = repo_cloned.storage_lock();
-
                     let map = HashMap::<String, String>::new();
                     let storage_type = StorageType::Complex(ComplexType::Map(
                         BasicType::String,
@@ -861,15 +894,14 @@ mod tests {
                     let object_key = format!("{}-{}", key_prefix, thread_number);
                     let storage_item = StorageItem::new(&object_key, storage_type, &map).unwrap();
 
-                    StorageRepo::insert(&mut storage, storage_item);
+                    repo_cloned.insert(storage_item);
                 });
             }
         });
 
         // verify inserted objects
         {
-            let storage = repo.storage_lock();
-            let object_keys = StorageRepo::object_keys(&storage);
+            let object_keys = repo.object_keys();
             assert_eq!(object_keys.len(), THREADS_COUNT);
             for thread_number in 0..THREADS_COUNT {
                 let object_key = format!("{}-{}", key_prefix, thread_number);
@@ -882,11 +914,10 @@ mod tests {
             for thread_number in 0..THREADS_COUNT {
                 let repo_cloned = repo.clone();
                 scope.spawn(move || {
-                    let mut storage = repo_cloned.storage_lock();
                     let object_key = format!("{}-{}", key_prefix, thread_number);
 
                     let mut map: HashMap<String, String> =
-                        StorageRepo::get_object(&storage, &object_key).unwrap();
+                        repo_cloned.get_object(&object_key).unwrap();
 
                     for entry_number in 0..MAP_ENTRIES_PER_THREAD {
                         let entry_key = format!("{}-{}", thread_number, entry_number);
@@ -894,7 +925,7 @@ mod tests {
                         map.insert(entry_key, entry_value);
                     }
 
-                    StorageRepo::update_object(&mut storage, &object_key, &map);
+                    repo_cloned.update_object(&object_key, &map);
                 });
             }
         });
@@ -904,10 +935,9 @@ mod tests {
             for thread_number in 0..THREADS_COUNT {
                 let repo_cloned = repo.clone();
                 scope.spawn(move || {
-                    let mut storage = repo_cloned.storage_lock();
                     let object_key = format!("{}-{}", key_prefix, thread_number);
                     let mut map: HashMap<String, String> =
-                        StorageRepo::get_object(&storage, &object_key).unwrap();
+                        repo_cloned.get_object(&object_key).unwrap();
 
                     for entry_number in 0..MAP_ENTRIES_PER_THREAD {
                         let entry_key = format!("{}-{}", thread_number, entry_number);
@@ -915,7 +945,7 @@ mod tests {
                         assert_eq!(map.remove(&entry_key).unwrap(), entry_value);
                     }
 
-                    StorageRepo::update_object(&mut storage, &object_key, &map);
+                    repo_cloned.update_object(&object_key, &map);
                 });
             }
         });
@@ -925,23 +955,18 @@ mod tests {
             for thread_number in 0..THREADS_COUNT {
                 let repo_cloned = repo.clone();
                 scope.spawn(move || {
-                    let mut storage = repo_cloned.storage_lock();
                     let object_key = format!("{}-{}", key_prefix, thread_number);
-                    let map: HashMap<String, String> =
-                        StorageRepo::get_object(&storage, &object_key).unwrap();
+                    let map: HashMap<String, String> = repo_cloned.get_object(&object_key).unwrap();
                     assert!(map.is_empty());
 
                     // remove storage object
-                    StorageRepo::remove(&mut storage, &object_key);
+                    repo_cloned.remove(&object_key);
                 });
             }
         });
 
         // ensure empty storage
-        {
-            let storage = repo.storage_lock();
-            assert!(StorageRepo::object_keys(&storage).is_empty());
-        }
+        assert!(repo.object_keys().is_empty());
     }
 
     #[test]
@@ -950,11 +975,9 @@ mod tests {
         use std::path::Path;
 
         let mut repo = StorageRepo::open_with_config(get_test_config());
-        {
-            // clean up the storage
-            let mut storage = repo.storage_lock();
-            StorageRepo::clear(&mut storage);
-        }
+
+        // clean up the storage
+        repo.clear();
 
         assert_eq!(repo.flush(), Ok(()));
 
@@ -979,13 +1002,10 @@ mod tests {
         my_map1.insert("3".into(), "Three".into());
 
         // insert the map into storage
-        {
-            let storage_type =
-                StorageType::Complex(ComplexType::Map(BasicType::String, BasicType::String));
-            let storage_item = StorageItem::new(key, storage_type, &my_map1).unwrap();
-            let mut storage = repo.storage_lock();
-            StorageRepo::insert(&mut storage, storage_item);
-        }
+        let storage_type =
+            StorageType::Complex(ComplexType::Map(BasicType::String, BasicType::String));
+        let storage_item = StorageItem::new(key, storage_type, &my_map1).unwrap();
+        repo.insert(storage_item);
 
         // persist the storage
         assert_eq!(repo.flush(), Ok(()));
@@ -1010,32 +1030,23 @@ mod tests {
         assert_eq!(entries[0].to_string_lossy().to_ascii_lowercase(), item_id);
 
         // clean up the storage
-        {
-            let mut storage = repo.storage_lock();
-            StorageRepo::clear(&mut storage);
+        repo.clear();
 
-            let object_keys = StorageRepo::object_keys(&storage);
-            assert!(object_keys.is_empty());
-        }
+        let object_keys = repo.object_keys();
+        assert!(object_keys.is_empty());
 
         // load storage
         assert_eq!(repo.load(), Ok(()));
 
         // verify loaded storage
-        {
-            let storage = repo.storage_lock();
-            let object_keys = StorageRepo::object_keys(&storage);
-            assert_eq!(object_keys.len(), 1);
-            assert_eq!(object_keys[0], key);
+        let object_keys = repo.object_keys();
+        assert_eq!(object_keys.len(), 1);
+        assert_eq!(object_keys[0], key);
 
-            let map: HashMap<String, String> = StorageRepo::get_object(&storage, key).unwrap();
-            assert_eq!(my_map1, map);
-        }
+        let map: HashMap<String, String> = repo.get_object(key).unwrap();
+        assert_eq!(my_map1, map);
 
         // clean up the storage
-        {
-            let mut storage = repo.storage_lock();
-            StorageRepo::clear(&mut storage);
-        }
+        repo.clear();
     }
 }
