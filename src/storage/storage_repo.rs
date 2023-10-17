@@ -1,4 +1,4 @@
-use super::{storage_codec::*, storage_const::*, storage_item::*};
+use super::{storage_codec::*, storage_const::*, storage_item::*, storage_packet::*};
 use crate::utils;
 use fs2::FileExt;
 use std::{
@@ -231,7 +231,7 @@ impl StorageRepo {
         let storage_config = self.config.storage.as_ref().unwrap();
         let storage_path = storage_config.data_path.as_path();
         let filepath = storage_path.join(FILE_STORAGE_INFO);
-        encode_to_file(storage_info, filepath)
+        encode_to_file(filepath, storage_info, StroragePacketType::StrorageInfo)
     }
 
     fn get_storage_blob_path(&self) -> PathBuf {
@@ -243,7 +243,7 @@ impl StorageRepo {
     fn persist_item(&self, item: &StorageItem) -> Result<(), String> {
         let storage_blob_path = self.get_storage_blob_path();
         let filepath = storage_blob_path.join(&item.id);
-        encode_to_file(item, filepath)
+        encode_to_file(filepath, item, StroragePacketType::StrorageItemBlob)
     }
 
     fn load_item(&self, item_id: String) -> Result<StorageItem, String> {
