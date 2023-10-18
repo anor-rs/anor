@@ -5,17 +5,43 @@ use std::{
     collections::{HashMap, HashSet},
     fs::{self, File, FileType},
     path::PathBuf,
-    sync::{Arc, Mutex, MutexGuard, RwLock, RwLockReadGuard},
+    sync::{Arc, Mutex, MutexGuard, RwLock},
     thread::{self, ThreadId},
     time::Duration,
 };
 
+macro_rules! take_guard {
+    ($g:expr) => {
+        match $g {
+            Ok(guard) => guard,
+            Err(_) => {
+                // poisoned, log and terminate
+                let err = format!("{} is poisoned", stringify!($g));
+                log::error!("{}", err);
+                panic!("{}", err);
+                /*
+                let guard = poisoned.into_inner();
+                if log::log_enabled!(log::Level::Warn) {
+                    log::warn!(
+                        "{} recovered from poisoning: {:?}",
+                        stringify!($g),
+                        *guard
+                    );
+                }
+                guard
+                */
+            }
+        }
+    };
+}
+
 pub struct StorageRepo {
     storage: Storage,
     config: Arc<utils::config::Config>,
-    lock: File,
+    instance_lock: File,
     global_lock: Mutex<()>,
-    global_lock_thread: RwLock<Option<ThreadId>>,
+    global_lock_param: RwLock<Option<ThreadId>>,
+    method_lock_sync: Mutex<()>,
     // saved: bool,
 }
 
@@ -37,8 +63,8 @@ impl Drop for GlobalStorageLock<'_> {
 impl GlobalStorageLock<'_> {
     /// Returns an exclusive access to the storage operations
     pub fn lock(storage_repo: &StorageRepo) -> GlobalStorageLock {
-        let guard = Self::guard_global_lock(storage_repo);
-        Self::set_global_lock_thread_id(storage_repo, Some(thread::current().id()));
+        let guard = take_guard!(storage_repo.global_lock.lock());
+        Self::set_global_lock_param(storage_repo, Some(thread::current().id()));
         GlobalStorageLock {
             storage_repo,
             guard: Some(guard),
@@ -47,59 +73,12 @@ impl GlobalStorageLock<'_> {
 
     /// Unlocks the exclusive access to the storage
     pub fn unlock(&mut self) {
-        Self::set_global_lock_thread_id(self.storage_repo, None);
+        Self::set_global_lock_param(self.storage_repo, None);
         self.guard = None;
     }
 
-    fn guard_global_lock(storage_repo: &StorageRepo) -> MutexGuard<()> {
-        match storage_repo.global_lock.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => {
-                // handle poisoned RwLock
-                let guard = poisoned.into_inner();
-                if log::log_enabled!(log::Level::Warn) {
-                    log::warn!(
-                        "RwLock `transaction_lock` recovered from poisoning: {:?}",
-                        *guard
-                    );
-                }
-                guard
-            }
-        }
-    }
-
-    fn read_guard_thread_id(storage_repo: &StorageRepo) -> RwLockReadGuard<Option<ThreadId>> {
-        match storage_repo.global_lock_thread.read() {
-            Ok(guard) => guard,
-            Err(poisoned) => {
-                // handle poisoned mutex
-                let guard = poisoned.into_inner();
-                if log::log_enabled!(log::Level::Warn) {
-                    log::warn!(
-                        "RwLock `global_lock_thread_id` recovered from poisoning: {:?}",
-                        *guard
-                    );
-                }
-                guard
-            }
-        }
-    }
-
-    fn set_global_lock_thread_id(storage_repo: &StorageRepo, option: Option<ThreadId>) {
-        let mut guard = match storage_repo.global_lock_thread.write() {
-            Ok(guard) => guard,
-            Err(poisoned) => {
-                // handle poisoned mutex
-                let guard = poisoned.into_inner();
-                if log::log_enabled!(log::Level::Warn) {
-                    log::warn!(
-                        "RwLock `global_lock_thread_id` recovered from poisoning: {:?}",
-                        *guard
-                    );
-                }
-                guard
-            }
-        };
+    fn set_global_lock_param(storage_repo: &StorageRepo, option: Option<ThreadId>) {
+        let mut guard = take_guard!(storage_repo.global_lock_param.write());
         *guard = option;
     }
 }
@@ -182,9 +161,10 @@ impl StorageRepo {
         StorageRepo {
             storage: Arc::new(Mutex::new(HashMap::new())),
             config,
-            lock,
+            instance_lock: lock,
             global_lock: Mutex::new(()),
-            global_lock_thread: RwLock::new(None),
+            global_lock_param: RwLock::new(None),
+            method_lock_sync: Mutex::new(()),
             // saved: true,
         }
     }
@@ -340,7 +320,7 @@ impl StorageRepo {
 
     /// Unlocks the storage
     fn unlock(&mut self) {
-        if let Err(err) = self.lock.unlock() {
+        if let Err(err) = self.instance_lock.unlock() {
             log::error!("{}", err);
         }
     }
@@ -354,13 +334,16 @@ impl StorageRepo {
     }
 
     /// Returns a guarded lock to access to the storage operations
-    fn lock(&self) -> MutexGuard<StorageMap> {
-        // when global locked, only locked thread should have access to storage operations
-        // other threads need to wait until global lock released
+    pub fn lock(&self) -> MutexGuard<StorageMap> {
+        // this method needs synchronization as is has a critical execution point not covered by other locks
+        let guard_method_lock = take_guard!(self.method_lock_sync.lock());
 
+        // when global lock used, only the thread that owns the global lock should have access to storage operations
+        // other threads need to wait until global lock released
+        // (1) making the decision about the need of a global lock
         let wait_for_global_lock_release = {
             // RwLockReadGuard needs to drop before obtaining a global lock to avoid deadlocks
-            let read_guard = GlobalStorageLock::read_guard_thread_id(self);
+            let read_guard = take_guard!(self.global_lock_param.read());
             if let Some(global_lock_thread_id) = read_guard.to_owned() {
                 global_lock_thread_id != thread::current().id()
             } else {
@@ -368,27 +351,37 @@ impl StorageRepo {
             }
         };
 
+        // -> this critical execution point protected with `method_lock_sync`
+        // there is a moment between (1) making the decision and (2) taking the actual lock phases
+
+        let mut global_lock = None;
         if wait_for_global_lock_release {
-            GlobalStorageLock::lock(self).unlock();
+            // (2) taking the global lock
+            global_lock = Some(GlobalStorageLock::lock(self));
         }
 
-        match self.storage.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => {
-                // handle poisoned mutex
-                let guard = poisoned.into_inner();
-                if log::log_enabled!(log::Level::Warn) {
-                    log::warn!("Mutex `storage` recovered from poisoning: {:?}", *guard);
-                }
-                guard
-            }
+        let guard_storage = take_guard!(self.storage.lock());
+
+        if let Some(mut guard_global_lock) = global_lock {
+            guard_global_lock.unlock();
         }
+
+        // release the method_lock_sync
+        drop(guard_method_lock);
+
+        guard_storage
     }
 
     /// Inserts an item into the storage.
-    /// If the storage did have an item with the key present, the item is updated.
+    /// If the storage has an item with the key present, the item will be updated.
     pub fn insert(&self, storage_item: StorageItem) {
         self.lock().insert(storage_item.key.clone(), storage_item);
+    }
+
+    /// Updates an item into the storage.
+    /// The item will be inserted if the storage does not have an item with the key present.
+    pub fn update(&self, storage_item: StorageItem) {
+        self.insert(storage_item);
     }
 
     /// Gets an item from the storage corresponding to the key
@@ -411,7 +404,7 @@ impl StorageRepo {
         self.lock().keys().cloned().collect()
     }
 
-    /// Returns an object of the item corresponding to the key
+    /// Returns the embedded object of the item corresponding to the key
     pub fn get_object<T: bincode::Decode>(&self, key: &str) -> Option<T> {
         if let Some(item) = self.get(key) {
             let object: Option<T> = item.get_object();
@@ -420,7 +413,7 @@ impl StorageRepo {
         None
     }
 
-    /// Updates the object of the item corresponding to the key
+    /// Updates the embedded object of the item corresponding to the key
     pub fn update_object<T: bincode::Encode>(&self, key: &str, obj: &T) -> bool {
         let mut guard = self.lock();
         if let Some(item) = guard.get_mut(key) {
@@ -501,13 +494,11 @@ mod tests {
         repo.insert(storage_item);
 
         assert_eq!(repo.object_keys().len(), 1);
-        {
-            let mut guard = repo.lock();
-            let item = guard.get_mut(key).unwrap();
-            assert_eq!(item.description, Some("abc".to_string()));
-            item.description = Some("abcd".to_string());
-        }
+        let mut item = repo.get(key).unwrap();
+        assert_eq!(item.description, Some("abc".to_string()));
 
+        item.description = Some("abcd".to_string());
+        repo.update(item);
         assert_eq!(repo.get(key).unwrap().description, Some("abcd".to_string()));
 
         // clean up the storage
