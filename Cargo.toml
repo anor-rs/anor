@@ -1,15 +1,15 @@
 [package]
 name = "anor"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Sheroz Khaydarov"]
-description = "Data Store"
+description = "Anor In-Memory Data Storage"
 documentation = "https://docs.rs/anor"
 readme = "README.md"
-repository = "https://github.com/sheroz/anor"
+repository = "https://github.com/anor-rs/anor"
 license = "MIT"
 keywords = ["data", "store", "cache"]
-categories = ["data-structures", "caching", "database", "filesystem"]
+categories = ["data-structures", "caching", "database"]
 
 [dependencies]
 log = "0.4"

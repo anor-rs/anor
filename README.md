@@ -1,4 +1,4 @@
-# Anor Data Store
+# Anor In-Memory Data Storage
 
 [![crates.io](https://img.shields.io/crates/v/anor)](https://crates.io/crates/anor)
 [![docs](https://img.shields.io/docsrs/anor)](https://docs.rs/anor)
