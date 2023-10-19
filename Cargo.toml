@@ -1,0 +1,12 @@
+[package]
+name = "anor-api"
+version = "0.1.0"
+edition = "2021"
+authors = ["Sheroz Khaydarov"]
+description = "Anor API Service"
+documentation = "https://docs.rs/anor-api"
+readme = "README.md"
+repository = "https://github.com/anor-rs/anor-api"
+license = "MIT"
+keywords = ["data", "store", "cache"]
+categories = ["data-structures", "caching", "database", "filesystem"]
