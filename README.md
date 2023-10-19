@@ -1,2 +1,2 @@
 # anor-api
-Anor Storage API
+Anor Storage Socket API
