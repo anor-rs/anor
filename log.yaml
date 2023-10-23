@@ -4,13 +4,13 @@ appenders:
         encoder:
             pattern: "{d(%+)(utc)} [{f}:{L}] {h({l})} {m}{n}"
 root:
-    level: debug
+    level: info
     appenders:
         - stdout
 
 loggers:
     anor::utils::config:
-        level: debug
+        level: info
 
     anor::storage:
-        level: trace
+        level: info

@@ -5,16 +5,16 @@ const STORAGE_PACKET_VERSION: u8 = 1;
 #[derive(Debug, Clone, Copy)]
 pub enum StroragePacketType {
     StrorageInfo = 1,
-    StrorageItemBlob = 2,
-    StrorageItemObjectBlob = 3,
+    StrorageItem = 2,
+    StrorageItemObject = 3,
 }
 
 impl From<u8> for StroragePacketType {
     fn from(v: u8) -> Self {
         match v {
             1 => StroragePacketType::StrorageInfo,
-            2 => StroragePacketType::StrorageItemBlob,
-            3 => StroragePacketType::StrorageItemObjectBlob,
+            2 => StroragePacketType::StrorageItem,
+            3 => StroragePacketType::StrorageItemObject,
             _ => panic!("Unmatched StroragePacketType value {}", v),
         }
     }
