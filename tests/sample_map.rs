@@ -1,7 +1,8 @@
-fn main() {
+#[test]
+fn sample_map() {
     use anor::storage::{storage_item::*, Storage};
     use std::collections::HashMap;
-    
+
     let key = "my_map";
 
     let mut sample_map = HashMap::<u8, String>::new();
@@ -9,6 +10,7 @@ fn main() {
     sample_map.insert(2, "Two".into());
     sample_map.insert(3, "Three".into());
 
+    // storage would be dropped after leaving the scope
     {
         // open a storage according to the configuration given in config.yaml
         let storage = Storage::open();
@@ -54,6 +56,4 @@ fn main() {
             (4, "Four".into())
         ])
     );
-
-    println!("Loaded object: {}: {:?}", key, map_loaded);
 }

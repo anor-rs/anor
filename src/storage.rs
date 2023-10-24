@@ -434,29 +434,16 @@ impl Storage {
 
 #[cfg(test)]
 mod tests {
-    use std::{path::PathBuf, thread, time::Duration};
+    use std::{thread, time::Duration};
 
     use super::*;
 
     const THREADS_COUNT: usize = 100;
     const MAP_ENTRIES_PER_THREAD: usize = 10;
 
-    fn get_test_config() -> Arc<utils::config::Config> {
-        // tmp dir is `/tmp` directory of the package root (anor)
-        let tmp_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tmp");
-        let data_path = tmp_dir.join("anor");
-        let storage_config = utils::config::Storage { data_path };
-        Arc::new(utils::config::Config {
-            storage: Some(storage_config),
-            server: None,
-            file_server: None,
-            remote: None,
-        })
-    }
-
     #[test]
     fn storage_open_test() {
-        let storage = Storage::open_with_config(get_test_config());
+        let storage = Storage::open();
 
         // clean up the storage
         storage.clear();
@@ -465,7 +452,7 @@ mod tests {
 
     #[test]
     fn storage_insert_test() {
-        let storage = Storage::open_with_config(get_test_config());
+        let storage = Storage::open();
 
         // clean up the storage
         storage.clear();
@@ -487,7 +474,7 @@ mod tests {
 
     #[test]
     fn storage_update_test() {
-        let storage = Storage::open_with_config(get_test_config());
+        let storage = Storage::open();
 
         // clean up the storage
         storage.clear();
@@ -517,7 +504,7 @@ mod tests {
 
     #[test]
     fn storage_remove_test() {
-        let storage = Storage::open_with_config(get_test_config());
+        let storage = Storage::open();
 
         // clean up the storage
         storage.clear();
@@ -539,7 +526,7 @@ mod tests {
 
     #[test]
     fn storage_clear_test() {
-        let storage = Storage::open_with_config(get_test_config());
+        let storage = Storage::open();
 
         // clean up the storage
         storage.clear();
@@ -561,7 +548,7 @@ mod tests {
 
     #[test]
     fn storage_object_test() {
-        let storage = Storage::open_with_config(get_test_config());
+        let storage = Storage::open();
 
         // clean up the storage
         storage.clear();
@@ -597,7 +584,7 @@ mod tests {
     #[test]
     fn multithread_map_insert_test() {
         let key = "my_map";
-        let storage = Arc::new(Storage::open_with_config(get_test_config()));
+        let storage = Arc::new(Storage::open());
 
         // clean up the storage
         storage.clear();
@@ -655,7 +642,7 @@ mod tests {
 
     #[test]
     fn multithread_map_get_test() {
-        let storage = Arc::new(Storage::open_with_config(get_test_config()));
+        let storage = Arc::new(Storage::open());
 
         // clean up the storage
         storage.clear();
@@ -713,7 +700,7 @@ mod tests {
 
     #[test]
     fn multithread_map_remove_test() {
-        let storage = Arc::new(Storage::open_with_config(get_test_config()));
+        let storage = Arc::new(Storage::open());
 
         // clean up the storage
         storage.clear();
@@ -770,7 +757,7 @@ mod tests {
 
     #[test]
     fn multithread_multiobject_test() {
-        let storage = Arc::new(Storage::open_with_config(get_test_config()));
+        let storage = Arc::new(Storage::open());
 
         // clean up the storage
         storage.clear();
@@ -885,7 +872,7 @@ mod tests {
 
     #[test]
     fn multithread_scoped_multiobject_test() {
-        let storage = Arc::new(Storage::open_with_config(get_test_config()));
+        let storage = Arc::new(Storage::open());
 
         // clean up the storage
         storage.clear();
@@ -986,7 +973,7 @@ mod tests {
         use std::fs;
         use std::path::Path;
 
-        let mut storage = Storage::open_with_config(get_test_config());
+        let mut storage = Storage::open();
 
         // clean up the storage
         storage.clear();
@@ -1060,97 +1047,5 @@ mod tests {
 
         // clean up the storage
         storage.clear();
-    }
-
-    #[test]
-    fn sample_string_test() {
-        let key = "my_string1";
-        let my_string = String::from("abc");
-
-        {
-            let storage = Storage::open_with_config(get_test_config());
-
-            // creating a new item with an inner string object
-            let storage_item = StorageItem::new(key, &my_string).unwrap();
-
-            // inserting item into storage
-            storage.insert(storage_item);
-
-            // get the string from the storage by key
-            let mut string_value: String = storage.get_inner_object(key).unwrap();
-            assert_eq!(string_value, my_string);
-
-            // modify the string
-            string_value += "def";
-
-            // update the storage
-            storage.update_inner_object(key, &string_value);
-
-            // storage would be dropped here as it going out from the scope
-            // this will persist storage content
-        }
-
-        // open the storage
-        let storage_loaded = Storage::open_with_config(get_test_config());
-
-        // get inner value from the storage by key
-        let loaded_value = storage_loaded.get_inner_object::<String>(key).unwrap();
-        assert_eq!(loaded_value, "abcdef");
-    }
-
-    #[test]
-    fn sample_map_test() {
-        let key = "my_map";
-
-        let mut sample_map = HashMap::<u8, String>::new();
-        sample_map.insert(1, "One".into());
-        sample_map.insert(2, "Two".into());
-        sample_map.insert(3, "Three".into());
-    
-        {
-            // open a storage according to the configuration given in config.yaml
-            let storage = Storage::open_with_config(get_test_config());
-    
-            // define item type
-            let storage_type = ItemType::Complex(ComplexType::Map(BasicType::U8, BasicType::String));
-    
-            // create a new item with an inner map object
-            let mut storage_item = StorageItem::with_type(key, storage_type, &sample_map).unwrap();
-            storage_item.set_description("My sample spelling dictionary");
-            storage_item.add_tag("dictionary");
-            storage_item.add_metafield("language", "en");
-    
-            // insert item into storage
-            storage.insert(storage_item);
-    
-            // get the map from the storage by key
-            let mut map: HashMap<u8, String> = storage.get_inner_object(key).unwrap();
-            assert_eq!(map, sample_map);
-    
-            // modify the map
-            map.insert(4, "Four".into());
-    
-            // update the storage
-            storage.update_inner_object(key, &map);
-    
-            // storage would be dropped here as it going out from the scope
-            // this will persist storage content
-            // the storage can be manually dropped also by using: drop(storage)
-        }
-    
-        // open the storage
-        let storage_loaded = Storage::open_with_config(get_test_config());
-    
-        // get the map from the storage by key
-        let map_loaded: HashMap<u8, String> = storage_loaded.get_inner_object(key).unwrap();
-        assert_eq!(
-            map_loaded,
-            HashMap::from([
-                (1, "One".into()),
-                (2, "Two".into()),
-                (3, "Three".into()),
-                (4, "Four".into())
-            ])
-        );
     }
 }

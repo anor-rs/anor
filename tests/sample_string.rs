@@ -1,9 +1,11 @@
-fn main() {
+#[test]
+fn sample_string() {
     use anor::storage::{storage_item::*, Storage};
 
     let key = "my_string";
     let sample_string = String::from("abc");
 
+    // storage would be dropped after leaving the scope
     {
         // open a storage according to the configuration given in config.yaml
         let storage = Storage::open();
@@ -24,7 +26,7 @@ fn main() {
         // update the storage
         storage.update_inner_object(key, &string_value);
 
-        // storage would be dropped here as it going out from the scope
+        // `storage` would be dropped here as it going out from the scope
         // this will persist storage content
         // the storage can be manually dropped also by using: drop(storage)
     }
@@ -35,6 +37,4 @@ fn main() {
     // get the string from the storage by key
     let loaded_value = storage_loaded.get_inner_object::<String>(key).unwrap();
     assert_eq!(loaded_value, "abcdef");
-
-    println!("Loaded object: {}: {:?}", key, loaded_value);
 }

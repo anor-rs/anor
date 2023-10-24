@@ -17,14 +17,14 @@ Anor storage supports point-in-time, snapshot-based persistence.
 
 ## Usage
 
-Please look at [samples](src/bin)
+Please look at [samples](tests)
 
 ### Usage samples
 
-- [Sample String](src/bin/sample_string.rs)
-- [Sample Map](src/bin/sample_map.rs)
+- [Sample String](tests/sample_string.rs)
+- [Sample Map](tests/sample_map.rs)
 
-### Sample string [sample_string.rs](src/bin/sample_string.rs)
+### Sample string [sample_string.rs](tests/sample_string.rs)
 
 ```rust
 use anor::storage::{storage_item::*, Storage};
@@ -32,6 +32,7 @@ use anor::storage::{storage_item::*, Storage};
 let key = "my_string";
 let sample_string = String::from("abc");
 
+// storage would be dropped after leaving the scope
 {
     // open a storage according to the configuration given in config.yaml
     let storage = Storage::open();
@@ -63,11 +64,9 @@ let storage_loaded = Storage::open();
 // get the string from the storage by key
 let loaded_value = storage_loaded.get_inner_object::<String>(key).unwrap();
 assert_eq!(loaded_value, "abcdef");
-
-println!("Loaded object: {}: {:?}", key, loaded_value);
 ```
 
-### Sample Map [sample_map.rs](src/bin/sample_map.rs)
+### Sample Map [sample_map.rs](tests/sample_map.rs)
 
 ```rust
 use anor::storage::{storage_item::*, Storage};
@@ -80,6 +79,7 @@ sample_map.insert(1, "One".into());
 sample_map.insert(2, "Two".into());
 sample_map.insert(3, "Three".into());
 
+// storage would be dropped after leaving the scope
 {
     // open a storage according to the configuration given in config.yaml
     let storage = Storage::open();
@@ -125,6 +125,4 @@ assert_eq!(
         (4, "Four".into())
     ])
 );
-
-println!("Loaded object: {}: {:?}", key, map_loaded);
 ```

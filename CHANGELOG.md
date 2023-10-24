@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## Unrealeased
+
+* configuration support per build profile
+
 ## 0.1.2 (2023-10-24)
 
 * added usage samples

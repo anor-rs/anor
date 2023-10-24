@@ -3,6 +3,11 @@ use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use super::build_profile;
+
+const DEFAULT_CONFIG_FILENAME_RELEASE: &str = "anor-config.yaml";
+const DEFAULT_CONFIG_FILENAME_DEBUG: &str = "anor-config-debug.yaml";
+
 const DEFAULT_STORAGE_DATA_PATH: &str = "/var/anor";
 
 const DEFAULT_SERVER_LISTEN_ADDRESS: &str = "127.0.0.1";
@@ -42,9 +47,17 @@ pub struct Remote {
 }
 
 pub fn get_config() -> Arc<Config> {
-    let config_file = std::fs::File::open("config.yaml").expect("Could not open config file.");
-    let config_map: HashMap<String, HashMap<String, String>> =
-        serde_yaml::from_reader(config_file).expect("Could not parse config file.");
+    let config_filename = if build_profile::debug_mode() {
+        DEFAULT_CONFIG_FILENAME_DEBUG
+    } else {
+        DEFAULT_CONFIG_FILENAME_RELEASE
+    };
+
+    let config_file = std::fs::File::open(config_filename)
+        .unwrap_or_else(|_| panic!("Could not open {} file.", config_filename));
+
+    let config_map: HashMap<String, HashMap<String, String>> = serde_yaml::from_reader(config_file)
+        .unwrap_or_else(|_| panic!("Could not parse {} file.", config_filename));
 
     if log::log_enabled!(log::Level::Trace) {
         log::trace!("loaded config:\n{:#?}", config_map);
@@ -60,10 +73,17 @@ pub fn get_config() -> Arc<Config> {
     let map_key = "storage";
     if config_map.contains_key(map_key) {
         let config_node = &config_map[map_key];
-        let data_path = parse_storage_path(config_node);
-        config.storage = Some(Storage {
-            data_path
-        });
+        let mut data_path = parse_storage_path(config_node);
+
+        // handle configuration for tests
+        if build_profile::is_cargo_test() {
+            data_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("target")
+                .join("tmp")
+                .join("anor");
+        }
+
+        config.storage = Some(Storage { data_path });
     }
 
     let map_key = "server";
@@ -74,9 +94,7 @@ pub fn get_config() -> Arc<Config> {
             DEFAULT_SERVER_LISTEN_ADDRESS,
             DEFAULT_SERVER_LISTEN_PORT,
         );
-        config.server = Some(Server {
-            listen_on,
-        });
+        config.server = Some(Server { listen_on });
     }
 
     let map_key = "file_server";
