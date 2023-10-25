@@ -1,0 +1,16 @@
+appenders:
+    stdout:
+        kind: console
+        encoder:
+            pattern: "{d(%+)(utc)} [{f}:{L}] {h({l})} {m}{n}"
+root:
+    level: trace
+    appenders:
+        - stdout
+
+loggers:
+    anor::utils::config:
+        level: debug
+
+    anor::storage:
+        level: debug

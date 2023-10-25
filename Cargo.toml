@@ -8,5 +8,14 @@ documentation = "https://docs.rs/anor-api"
 readme = "README.md"
 repository = "https://github.com/anor-rs/anor-api"
 license = "MIT"
-keywords = ["data", "store", "cache"]
-categories = ["data-structures", "caching", "database", "filesystem"]
+keywords = ["api", "server", "network", "data", "store", "cache"]
+categories = ["data-structures", "caching", "database", "network-programming"]
+
+[dependencies]
+log = "0.4"
+log4rs = "1.2"
+
+anor = { git = "https://github.com/anor-rs/anor.git" }
+
+hyper = { version = "1.0.0-rc.4", features = ["full"] }
+hyper-util = { git = "https://github.com/hyperium/hyper-util.git" }

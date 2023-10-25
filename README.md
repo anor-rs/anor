@@ -5,9 +5,7 @@
 [![build & test](https://github.com/anor-rs/anor-api/actions/workflows/ci.yml/badge.svg)](https://github.com/anor-rs/anor-api/actions/workflows/ci.yml)
 [![MIT](https://img.shields.io/github/license/anor-rs/anor-api)](https://github.com/anor-rs/anor-api/tree/main/LICENSE)
 
-<img src="https://github.com/anor-rs/anor/blob/main/docs/img/anor-wb.svg" width=25%>
-
-The Socket API Service for [Anor](https://github.com/anor-rs)
+The Storage API Service for [Anor](https://github.com/anor-rs)
 
 ## Project Stage
 
