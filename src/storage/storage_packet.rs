@@ -1,6 +1,9 @@
 const STORAGE_PACKET_HEADER_SIZE: usize = 11;
 const STORAGE_PACKET_VERSION: u8 = 1;
 
+/// StoragePacketMetaFields
+pub type StoragePacketFields = Vec<(String, String)>;
+
 /// Strorage Packet Type
 #[derive(Debug, Clone, Copy)]
 pub enum StroragePacketType {
@@ -85,14 +88,14 @@ pub fn build_storage_packet(
     packet_type: StroragePacketType,
     codec_type: StrorageCodecType,
 ) -> StroragePacket {
-    let header = build_storage_packet_header(&buf, packet_type, codec_type);
+    let header = build_packet_header(&buf, packet_type, codec_type);
     StroragePacket { header, data: buf }
 }
 
 /// parses a buffer into storage packet
-pub fn parse_storage_packet(buf: Vec<u8>) -> Result<StroragePacket, String> {
+pub fn parse_packet(buf: Vec<u8>) -> Result<StroragePacket, String> {
     // parse header
-    let header = parse_storage_packet_header(&buf)?;
+    let header = parse_packet_header(&buf)?;
 
     // convert the buf into data part
     let mut data = buf;
@@ -102,21 +105,21 @@ pub fn parse_storage_packet(buf: Vec<u8>) -> Result<StroragePacket, String> {
 }
 
 /// builds a storage packet header
-pub fn build_storage_packet_header(
+pub fn build_packet_header(
     buf: &[u8],
     packet_type: StroragePacketType,
     codec_type: StrorageCodecType,
 ) -> StroragePacketHeader {
     StroragePacketHeader {
+        packet_length: (buf.len() + STORAGE_PACKET_HEADER_SIZE) as u64,
         packet_type,
         packet_version: STORAGE_PACKET_VERSION,
         codec_type,
-        packet_length: (buf.len() + STORAGE_PACKET_HEADER_SIZE) as u64,
     }
 }
 
 /// parses storage packet header
-pub fn parse_storage_packet_header(buf: &[u8]) -> Result<StroragePacketHeader, String> {
+pub fn parse_packet_header(buf: &[u8]) -> Result<StroragePacketHeader, String> {
     let buf_len = buf.len();
     if buf_len < STORAGE_PACKET_HEADER_SIZE {
         return Err(format!(
@@ -144,4 +147,48 @@ pub fn parse_storage_packet_header(buf: &[u8]) -> Result<StroragePacketHeader, S
     };
 
     Ok(header)
+}
+
+pub fn packet_metafields(
+    packet_type: StroragePacketType,
+    _packet_version: u8,
+) -> (StoragePacketFields, StoragePacketFields) {
+    let header = [
+        ("packet_length", "u64"),
+        ("packet_type", "StroragePacketType{StrorageInfo=1,StrorageItem=2,StrorageItemObject=3}"),
+        ("packet_version", "u8"),
+        ("codec_type", "StrorageCodecType{Bincode=1,ProtocolBuffers=2,FlatBuffers=3,MessagePack=4,CapnProto=5}"),
+    ];
+
+    let object = match packet_type {
+        StroragePacketType::StrorageInfo => {
+            [("StrorageInfo", "HashMap<String, (String, u64)>")].to_vec()
+        }
+        StroragePacketType::StrorageItem => [
+            ("id", "String"),
+            ("key", "String"),
+            ("version", "u64"),
+            ("data", "Vec<u8>"),
+            ("item_type", "ItemType"),
+            ("description", "Option<String>"),
+            ("tags", "Option<Vec<String>>"),
+            ("metafields", "Option<HashMap<String,String>>"),
+            ("expires_on", "Option<u64>"),
+            ("storage_locations", "Vec<StorageLocation>"),
+            ("redundancy", "u8"),
+        ]
+        .to_vec(),
+        StroragePacketType::StrorageItemObject => [("StrorageItemObject", "Vec[u8]")].to_vec(),
+    };
+
+    (
+        header
+            .iter()
+            .map(|v| (v.0.to_string(), v.1.to_string()))
+            .collect::<Vec<_>>(),
+        object
+            .iter()
+            .map(|v| (v.0.to_string(), v.1.to_string()))
+            .collect::<Vec<_>>(),
+    )
 }

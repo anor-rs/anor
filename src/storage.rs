@@ -58,22 +58,22 @@ pub struct Storage {
 type StorageMap = HashMap<String, StorageItem>;
 type StorageInfo = HashMap<String, (String, u64)>;
 
-struct GlobalStorageLock<'a> {
+pub struct GlobalLock<'a> {
     storage: &'a Storage,
     guard: Option<MutexGuard<'a, ()>>,
 }
 
-impl Drop for GlobalStorageLock<'_> {
+impl Drop for GlobalLock<'_> {
     fn drop(&mut self) {
         self.unlock();
     }
 }
-impl GlobalStorageLock<'_> {
+impl GlobalLock<'_> {
     /// Returns an exclusive access to the storage operations
-    pub fn lock(storage: &Storage) -> GlobalStorageLock {
+    pub fn lock(storage: &Storage) -> GlobalLock {
         let guard = take_guard!(storage.global_lock.lock());
         Self::set_global_lock_param(storage, Some(thread::current().id()));
-        GlobalStorageLock {
+        GlobalLock {
             storage,
             guard: Some(guard),
         }
@@ -105,11 +105,14 @@ impl Drop for Storage {
 
 // #[allow(clippy::arc_with_non_send_sync)]
 impl Storage {
+
+    /// Opens a storage and loads persisted data
     pub fn open() -> Self {
         let config = utils::config::get_config();
         Self::open_with_config(config)
     }
 
+    /// Opens a storage with specified configuration and loads persisted data
     pub fn open_with_config(config: Arc<utils::config::Config>) -> Self {
         let mut storage = Self::init(config.clone());
         if let Err(err) = storage.load() {
@@ -124,7 +127,7 @@ impl Storage {
         unimplemented!()
     }
 
-    /// initializes the storage
+    /// initialize the storage
     fn init(config: Arc<utils::config::Config>) -> Storage {
         let storage_config = config.storage.as_ref().unwrap();
         let storage_path = storage_config.data_path.as_path();
@@ -138,7 +141,7 @@ impl Storage {
         // try to lock the local storage for exclusive access
         // that prevents access to the stored data from other instances to ensure data consistency
         let lock_filepath = storage_path.join(FILE_STORAGE_LOCK);
-        let lock = match fs::OpenOptions::new()
+        let instance_lock = match fs::OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
@@ -151,9 +154,12 @@ impl Storage {
             }
         };
 
-        let mut lock_attempt_count = 50;
-        while let Err(err) = lock.try_lock_exclusive() {
-            if lock_attempt_count < 0 {
+        
+        let mut lock_try_count = 100;
+        let lock_try_duration = Duration::from_millis((INSTANCE_LOCK_TIMEOUT_MILLISECONDS/lock_try_count) as u64);
+
+        while let Err(err) = instance_lock.try_lock_exclusive() {
+            if lock_try_count == 0 {
                 let error_message = format!(
                     "Could not obtain a lock `{}` to open the local storage! Error Message: {}",
                     lock_filepath.to_string_lossy(),
@@ -162,14 +168,14 @@ impl Storage {
                 log::error!("{}", error_message);
                 panic!("{}", error_message);
             }
-            thread::sleep(Duration::from_millis(100));
-            lock_attempt_count -= 1;
+            thread::sleep(lock_try_duration);
+            lock_try_count -= 1;
         }
 
         Storage {
             storage_map: Arc::new(Mutex::new(HashMap::new())),
             config,
-            instance_lock: lock,
+            instance_lock,
             global_lock: Mutex::new(()),
             global_lock_param: RwLock::new(None),
             method_lock_sync: Mutex::new(()),
@@ -177,9 +183,9 @@ impl Storage {
         }
     }
 
-    /// Loads the persisted data into storage
+    /// Loads persisted data into storage
     pub fn load(&mut self) -> Result<(), String> {
-        let mut global_storage_lock = GlobalStorageLock::lock(self);
+        let mut global_lock = self.global_lock();
         self.clear();
 
         // load storage info
@@ -203,13 +209,13 @@ impl Storage {
                 log::error!("{}", err);
             }
         };
-        global_storage_lock.unlock();
+        global_lock.unlock();
         Ok(())
     }
 
-    /// Persists the storage data
+    /// Persists storage data
     pub fn flush(&mut self) -> Result<(), String> {
-        let mut global_storage_lock = GlobalStorageLock::lock(self);
+        let mut global_lock = self.global_lock();
 
         // load locally persisted storage info
         let persisted_info = match self.load_storage_info() {
@@ -290,7 +296,7 @@ impl Storage {
                 }
             }
         }
-        global_storage_lock.unlock();
+        global_lock.unlock();
         Ok(())
     }
 
@@ -362,22 +368,27 @@ impl Storage {
         // -> this critical execution point protected with `method_lock_sync`
         // there is a moment between (1) making the decision and (2) taking the actual lock phases
 
-        let mut global_lock = None;
+        let mut option_global_lock = None;
         if wait_for_global_lock_release {
             // (2) taking the global lock
-            global_lock = Some(GlobalStorageLock::lock(self));
+            option_global_lock = Some(self.global_lock());
         }
 
         let guard_storage = take_guard!(self.storage_map.lock());
 
-        if let Some(mut guard_global_lock) = global_lock {
-            guard_global_lock.unlock();
+        if let Some(mut global_lock) = option_global_lock {
+            global_lock.unlock();
         }
 
         // release the method_lock_sync
         drop(guard_method_lock);
 
         guard_storage
+    }
+
+    /// Returns a global lock to exclusive thread access to the storage operations
+    pub fn global_lock(&self) -> GlobalLock {
+        GlobalLock::lock(self)
     }
 
     /// Inserts an item into the storage
@@ -604,7 +615,7 @@ mod tests {
             let storage_clone = storage.clone();
             let entries_count = MAP_ENTRIES_PER_THREAD;
             let handler = thread::spawn(move || {
-                let mut g_lock = GlobalStorageLock::lock(&storage_clone);
+                let mut global_lock = storage_clone.global_lock();
                 let mut map: HashMap<String, String> = storage_clone.get_inner_object(key).unwrap();
                 for entry_number in 0..entries_count {
                     let entry_key = format!("{}-{}", thread_number, entry_number);
@@ -612,7 +623,7 @@ mod tests {
                     map.insert(entry_key, entry_value);
                 }
                 storage_clone.update_inner_object(key, &map);
-                g_lock.unlock();
+                global_lock.unlock();
                 thread::sleep(Duration::from_millis(1));
             });
             threads.push(handler);
@@ -729,7 +740,7 @@ mod tests {
             let storage_clone = storage.clone();
             let entries_count = MAP_ENTRIES_PER_THREAD;
             let handler = thread::spawn(move || {
-                let mut g_lock = GlobalStorageLock::lock(&storage_clone);
+                let mut global_lock = storage_clone.global_lock();
                 let mut map: HashMap<String, String> = storage_clone.get_inner_object(key).unwrap();
                 for entry_number in 0..entries_count {
                     let entry_key = format!("{}-{}", thread_number, entry_number);
@@ -737,7 +748,7 @@ mod tests {
                     assert_eq!(map.remove(&entry_key).unwrap(), entry_value);
                 }
                 storage_clone.update_inner_object(key, &map);
-                g_lock.unlock();
+                global_lock.unlock();
                 thread::sleep(Duration::from_millis(1));
             });
             threads.push(handler);

@@ -104,7 +104,7 @@ pub fn decode_from_file<T: bincode::Decode>(filepath: PathBuf) -> Result<T, Stri
     if let Ok(mut file) = File::open(&filepath) {
         let mut buf = vec![];
         match file.read_to_end(&mut buf) {
-            Ok(_) => match parse_storage_packet(buf) {
+            Ok(_) => match parse_packet(buf) {
                 Ok(packet) => {
                     if let Some(obj) = decode_from_binary(&packet.data, packet.header.codec_type) {
                         return Ok(obj);

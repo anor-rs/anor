@@ -5,11 +5,9 @@
 [![build & test](https://github.com/sheroz/anor/actions/workflows/ci.yml/badge.svg)](https://github.com/sheroz/anor/actions/workflows/ci.yml)
 [![MIT](https://img.shields.io/github/license/sheroz/anor)](https://github.com/sheroz/anor/tree/main/LICENSE.txt)
 
-<img src="docs/img/anor-wb.svg" width=25%>
-
 Anor storage is an open-source, in-memory key-value data store written in Rust.
 
-Anor storage supports point-in-time, snapshot-based persistence.
+The storage currently supports point-in-time, snapshot-based persistence in local disk.
 
 ## Project Stage
 
@@ -24,7 +22,7 @@ Please look at [samples](tests)
 - [Sample String](tests/sample_string.rs)
 - [Sample Map](tests/sample_map.rs)
 
-### Sample string [sample_string.rs](tests/sample_string.rs)
+### Sample of storing a string: [sample_string.rs](tests/sample_string.rs)
 
 ```rust
 use anor::storage::{storage_item::*, Storage};
@@ -66,7 +64,7 @@ let loaded_value = storage_loaded.get_inner_object::<String>(key).unwrap();
 assert_eq!(loaded_value, "abcdef");
 ```
 
-### Sample Map [sample_map.rs](tests/sample_map.rs)
+### Sample of storing a map: [sample_map.rs](tests/sample_map.rs)
 
 ```rust
 use anor::storage::{storage_item::*, Storage};
