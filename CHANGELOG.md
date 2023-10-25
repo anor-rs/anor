@@ -2,9 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
-## Unrealeased
+## Unreleased
 
 * configuration support per build profile
+* global lock usage simplified
 
 ## 0.1.2 (2023-10-24)
 
