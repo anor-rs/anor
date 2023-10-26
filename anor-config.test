@@ -2,13 +2,13 @@
 
 # storage settings
 storage:
-  data_path: "/tmp/anor"
+  data_path: "${CARGO_MANIFEST_DIR}/target/tmp/anor"
 
-# server node settings
-server:
+# api service settings
+api:
   name: anor1
-  description: "Anor server node #1, located in a primary data center"
-  id: anor1@anor_cdh_gdc
+  description: "Anor API Service"
+  id: anor1@anor
   access_token: face0aa08c29eb27aa3e0ebb7fe9d9a678a9caecc1f7b886e35bc16b1c266f42
   listen_addresses: 127.0.0.1
   listen_port: 9191
@@ -16,10 +16,14 @@ server:
   threads_max: 4
   ram_max: 512M
   disk_max: 2G
+  enabled: true
 
-file_server:
+# http service settings
+http:
+  description: "Anor HTTP Service"
   listen_addresses: 127.0.0.1
   listen_port: 8181
+  enabled: true
 
 # pool of remote server nodes
 remote:

@@ -11,21 +11,21 @@ use anor::storage::storage_item::StorageItem;
 
 use super::StorageApi;
 
-pub struct StorageApiServer {
+pub struct StorageApiService {
     storage: Storage,
     config: Arc<Config>,
 }
 
-pub type AnorApiMutex<'a> = Arc<Mutex<StorageApiServer>>;
+pub type AnorApiMutex<'a> = Arc<Mutex<StorageApiService>>;
 
-impl StorageApi for StorageApiServer {
+impl StorageApi for StorageApiService {
     fn with_config(storage: Storage, config: Arc<Config>) -> Self {
-        StorageApiServer { storage, config }
+        StorageApiService { storage, config }
     }
 
     fn start(&self, flag_shutdown: Arc<AtomicBool>, flag_ready: Arc<AtomicBool>) {
-        assert!(self.config.server.is_some());
-        let config_server = self.config.server.as_ref().unwrap();
+        assert!(self.config.api.is_some());
+        let config_server = self.config.api.as_ref().unwrap();
         assert!(!config_server.listen_on.is_empty());
         let listen_on = config_server.listen_on[0];
 
@@ -33,7 +33,7 @@ impl StorageApi for StorageApiServer {
         flag_ready.store(true, Ordering::SeqCst);
 
         log::info!(
-            "Anor Storage API server started listening on {} ...",
+            "Anor Storage API service started listening on {} ...",
             listen_on
         );
         // listener.set_nonblocking(true).unwrap();

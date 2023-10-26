@@ -4,7 +4,7 @@
 //!
 //! **Research:** This project is at the design stage, with some sketches of work but nothing usable yet.
 
-pub mod storage_api_server;
+pub mod storage_api_service;
 
 use anor::storage::storage_item::StorageItem;
 use anor::storage::Storage;
