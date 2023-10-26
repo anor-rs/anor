@@ -1,6 +1,6 @@
 use anor::storage::Storage;
-use anor::utils::config;
 use anor_api::storage_api::{storage_api_server::StorageApiServer, StorageApi};
+use anor_common::utils::config;
 use core::time;
 use log::{log_enabled, Level};
 use std::sync::atomic::{AtomicBool, Ordering};

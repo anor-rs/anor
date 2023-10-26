@@ -1,4 +1,5 @@
 use anor::storage::Storage;
+use anor_common::utils::config::Config;
 use log;
 use std::io::prelude::*;
 use std::net::{SocketAddr, TcpListener, TcpStream};
@@ -6,7 +7,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 
-use anor::{storage::storage_item::StorageItem, utils::config::Config};
+use anor::storage::storage_item::StorageItem;
 
 use super::StorageApi;
 
@@ -19,10 +20,7 @@ pub type AnorApiMutex<'a> = Arc<Mutex<StorageApiServer>>;
 
 impl StorageApi for StorageApiServer {
     fn with_config(storage: Storage, config: Arc<Config>) -> Self {
-        StorageApiServer {
-            storage,
-            config,
-        }
+        StorageApiServer { storage, config }
     }
 
     fn start(&self, flag_shutdown: Arc<AtomicBool>, flag_ready: Arc<AtomicBool>) {
@@ -82,7 +80,7 @@ impl StorageApi for StorageApiServer {
     }
 
     fn remove_item(&self, key: &str) -> bool {
-        self.storage.remove(key);    
+        self.storage.remove(key);
         true
     }
 }

@@ -16,6 +16,4 @@ log = "0.4"
 log4rs = "1.2"
 
 anor = { git = "https://github.com/anor-rs/anor.git" }
-
-hyper = { version = "1.0.0-rc.4", features = ["full"] }
-hyper-util = { git = "https://github.com/hyperium/hyper-util.git" }
+anor-common = { git = "https://github.com/anor-rs/anor-common.git" }

@@ -6,8 +6,9 @@
 
 pub mod storage_api_server;
 
+use anor::storage::storage_item::StorageItem;
 use anor::storage::Storage;
-use anor::{storage::storage_item::StorageItem, utils::config::Config};
+use anor_common::utils::config::Config;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
