@@ -17,13 +17,13 @@ pub fn substitute(src: &str) -> String {
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::path::PathBuf;
 
     #[test]
     fn substitute_test() {
         let src = "${CARGO_MANIFEST_DIR}/target/tmp/anor";
         let found = substitute(src);
 
+        use std::path::PathBuf;
         let expected = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("target")
             .join("tmp")

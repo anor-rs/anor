@@ -54,9 +54,9 @@ pub struct RemoteConfig {
 
 pub fn get_config() -> Arc<Config> {
     let config_filename = get_config_filename();
-    let mut config_file = std::fs::File::open(&config_filename)
+    let mut config_file = std::fs::File::open(config_filename)
         .unwrap_or_else(|_| panic!("Could not open {} file.", config_filename));
-    
+
     let mut config_content = String::new();
     if let Err(err) = config_file.read_to_string(&mut config_content) {
         log::error!("{}", err);
@@ -65,8 +65,9 @@ pub fn get_config() -> Arc<Config> {
 
     let config_substituted = envsubst::substitute(&config_content);
 
-    let config_map: HashMap<String, HashMap<String, String>> = serde_yaml::from_str(&config_substituted)
-        .unwrap_or_else(|_| panic!("Could not parse {} file.", config_filename));
+    let config_map: HashMap<String, HashMap<String, String>> =
+        serde_yaml::from_str(&config_substituted)
+            .unwrap_or_else(|_| panic!("Could not parse {} file.", config_filename));
 
     if log::log_enabled!(log::Level::Trace) {
         log::trace!("loaded config:\n{:#?}", config_map);
