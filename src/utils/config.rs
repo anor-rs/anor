@@ -53,17 +53,8 @@ pub struct RemoteConfig {
 }
 
 pub fn get_config() -> Arc<Config> {
-    let config_filename = if build_profile::debug_mode() {
-        if build_profile::is_cargo_test() {
-            DEFAULT_CONFIG_FILENAME_TEST
-        } else {
-            DEFAULT_CONFIG_FILENAME_DEBUG
-        }
-    } else {
-        DEFAULT_CONFIG_FILENAME_RELEASE
-    };
-
-    let mut config_file = std::fs::File::open(config_filename)
+    let config_filename = get_config_filename();
+    let mut config_file = std::fs::File::open(&config_filename)
         .unwrap_or_else(|_| panic!("Could not open {} file.", config_filename));
     
     let mut config_content = String::new();
@@ -91,7 +82,7 @@ pub fn get_config() -> Arc<Config> {
     let map_key = "storage";
     if config_map.contains_key(map_key) {
         let config_node = &config_map[map_key];
-        let mut data_path = parse_storage_path(config_node);
+        let data_path = parse_storage_path(config_node);
         config.storage = Some(StorageConfig { data_path });
     }
 
@@ -225,13 +216,27 @@ fn parse_enabled(node: &HashMap<String, String>) -> Option<bool> {
     }
 }
 
+fn get_config_filename() -> &'static str {
+    if build_profile::debug_mode() {
+        if build_profile::is_cargo_test() {
+            DEFAULT_CONFIG_FILENAME_TEST
+        } else {
+            DEFAULT_CONFIG_FILENAME_DEBUG
+        }
+    } else {
+        DEFAULT_CONFIG_FILENAME_RELEASE
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
 
     #[test]
-    fn test() {
+    fn test_config() {
         assert!(build_profile::is_cargo_test());
+        assert_eq!(get_config_filename(), DEFAULT_CONFIG_FILENAME_TEST);
+
         let config = get_config();
         let data_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("target")
