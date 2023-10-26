@@ -2,8 +2,8 @@
 
 [![crates.io](https://img.shields.io/crates/v/anor)](https://crates.io/crates/anor)
 [![docs](https://img.shields.io/docsrs/anor)](https://docs.rs/anor)
-[![build & test](https://github.com/sheroz/anor/actions/workflows/ci.yml/badge.svg)](https://github.com/sheroz/anor/actions/workflows/ci.yml)
-[![MIT](https://img.shields.io/github/license/sheroz/anor)](https://github.com/sheroz/anor/tree/main/LICENSE.txt)
+[![build & test](https://github.com/anor-rs/anor/actions/workflows/ci.yml/badge.svg)](https://github.com/anor-rs/anor/actions/workflows/ci.yml)
+[![MIT](https://img.shields.io/github/license/anor-rs/anor)](https://github.com/anor-rs/anor/tree/main/LICENSE.txt)
 
 Anor storage is an open-source, in-memory key-value data store written in Rust.
 

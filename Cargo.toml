@@ -20,3 +20,5 @@ serde_yaml = "0.9"
 
 bincode = "2.0.0-rc.3"
 fs2 = "0.4"
+
+anor-common = { git = "https://github.com/anor-rs/anor-common.git" }

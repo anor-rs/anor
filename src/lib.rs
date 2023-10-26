@@ -5,4 +5,3 @@
 //! **Development**: this project already has milestone releases, but is still under active development, you should not expect full stability yet.
 
 pub mod storage;
-pub mod utils;
