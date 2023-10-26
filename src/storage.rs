@@ -1,4 +1,4 @@
-use anor_common::utils;
+use anor_common::utils::config::{self, Config};
 use fs2::FileExt;
 use std::{
     collections::{HashMap, HashSet},
@@ -47,7 +47,7 @@ macro_rules! take_guard {
 
 pub struct Storage {
     storage_map: Arc<Mutex<StorageMap>>,
-    config: Arc<utils::config::Config>,
+    config: Arc<Config>,
     instance_lock: File,
     global_lock: Mutex<()>,
     global_lock_param: RwLock<Option<ThreadId>>,
@@ -105,15 +105,14 @@ impl Drop for Storage {
 
 // #[allow(clippy::arc_with_non_send_sync)]
 impl Storage {
-
     /// Opens a storage and loads persisted data
     pub fn open() -> Self {
-        let config = utils::config::get_config();
+        let config = config::get_config();
         Self::open_with_config(config)
     }
 
     /// Opens a storage with specified configuration and loads persisted data
-    pub fn open_with_config(config: Arc<utils::config::Config>) -> Self {
+    pub fn open_with_config(config: Arc<Config>) -> Self {
         let mut storage = Self::init(config.clone());
         if let Err(err) = storage.load() {
             storage.unlock();
@@ -128,7 +127,7 @@ impl Storage {
     }
 
     /// initialize the storage
-    fn init(config: Arc<utils::config::Config>) -> Storage {
+    fn init(config: Arc<Config>) -> Storage {
         let storage_config = config.storage.as_ref().unwrap();
         let storage_path = storage_config.data_path.as_path();
 
@@ -154,9 +153,9 @@ impl Storage {
             }
         };
 
-        
         let mut lock_try_count = 100;
-        let lock_try_duration = Duration::from_millis((INSTANCE_LOCK_TIMEOUT_MILLISECONDS/lock_try_count) as u64);
+        let lock_try_duration =
+            Duration::from_millis((INSTANCE_LOCK_TIMEOUT_MILLISECONDS / lock_try_count) as u64);
 
         while let Err(err) = instance_lock.try_lock_exclusive() {
             if lock_try_count == 0 {
