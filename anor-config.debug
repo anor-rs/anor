@@ -2,7 +2,7 @@
 
 # storage settings
 storage:
-  data_path: "/var/anor"
+  data_path: "/tmp/anor"
 
 # api service settings
 api:

@@ -1,62 +1,71 @@
 use std::collections::HashMap;
+use std::io::Read;
 use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use super::build_profile;
+use super::{build_profile, envsubst};
 
 const DEFAULT_CONFIG_FILENAME_RELEASE: &str = "anor-config.yaml";
-const DEFAULT_CONFIG_FILENAME_DEBUG: &str = "anor-config.debug.yaml";
+const DEFAULT_CONFIG_FILENAME_DEBUG: &str = "anor-config.debug";
+const DEFAULT_CONFIG_FILENAME_TEST: &str = "anor-config.test";
 
 const DEFAULT_STORAGE_DATA_PATH: &str = "/var/anor";
 
-const DEFAULT_SERVER_LISTEN_ADDRESS: &str = "127.0.0.1";
-const DEFAULT_SERVER_LISTEN_PORT: u16 = 7311;
+const DEFAULT_API_SERVICE_LISTEN_ADDRESS: &str = "127.0.0.1";
+const DEFAULT_API_SERVICE_LISTEN_PORT: u16 = 7311;
+const DEFAULT_API_SERVICE_ENABLED: bool = false;
 
-const DEFAULT_FILE_SERVER_LISTEN_ADDRESS: &str = "127.0.0.1";
-const DEFAULT_FILE_SERVER_LISTEN_PORT: u16 = 8181;
+const DEFAULT_HTTP_SERVICE_LISTEN_ADDRESS: &str = "127.0.0.1";
+const DEFAULT_HTTP_SERVICE_LISTEN_PORT: u16 = 8181;
+const DEFAULT_HTTP_SERVICE_ENABLED: bool = false;
 
 const DEFAULT_REMOTE_NODE: &str = "127.0.0.1:9191";
 
 #[derive(Debug)]
 pub struct Config {
-    pub storage: Option<Storage>,
-    pub server: Option<Server>,
-    pub file_server: Option<FileServer>,
-    pub remote: Option<Remote>,
+    pub storage: Option<StorageConfig>,
+    pub api: Option<ApiConfig>,
+    pub http: Option<HttpConfig>,
+    pub remote: Option<RemoteConfig>,
 }
 
 #[derive(Debug)]
-pub struct Storage {
+pub struct StorageConfig {
     pub data_path: PathBuf,
 }
 
 #[derive(Debug)]
-pub struct Server {
+pub struct ApiConfig {
     pub listen_on: Vec<SocketAddr>,
+    pub enabled: bool,
 }
 
 #[derive(Debug)]
-pub struct FileServer {
+pub struct HttpConfig {
     pub listen_on: Vec<SocketAddr>,
+    pub enabled: bool,
 }
 
 #[derive(Debug)]
-pub struct Remote {
+pub struct RemoteConfig {
     pub nodes: Vec<SocketAddr>,
 }
 
 pub fn get_config() -> Arc<Config> {
-    let config_filename = if build_profile::debug_mode() {
-        DEFAULT_CONFIG_FILENAME_DEBUG
-    } else {
-        DEFAULT_CONFIG_FILENAME_RELEASE
-    };
-
-    let config_file = std::fs::File::open(config_filename)
+    let config_filename = get_config_filename();
+    let mut config_file = std::fs::File::open(&config_filename)
         .unwrap_or_else(|_| panic!("Could not open {} file.", config_filename));
+    
+    let mut config_content = String::new();
+    if let Err(err) = config_file.read_to_string(&mut config_content) {
+        log::error!("{}", err);
+        panic!("{}", err);
+    }
 
-    let config_map: HashMap<String, HashMap<String, String>> = serde_yaml::from_reader(config_file)
+    let config_substituted = envsubst::substitute(&config_content);
+
+    let config_map: HashMap<String, HashMap<String, String>> = serde_yaml::from_str(&config_substituted)
         .unwrap_or_else(|_| panic!("Could not parse {} file.", config_filename));
 
     if log::log_enabled!(log::Level::Trace) {
@@ -65,47 +74,40 @@ pub fn get_config() -> Arc<Config> {
 
     let mut config = Config {
         storage: None,
-        server: None,
-        file_server: None,
+        api: None,
+        http: None,
         remote: None,
     };
 
     let map_key = "storage";
     if config_map.contains_key(map_key) {
         let config_node = &config_map[map_key];
-        let mut data_path = parse_storage_path(config_node);
-
-        // handle configuration for tests
-        if build_profile::is_cargo_test() {
-            data_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join("target")
-                .join("tmp")
-                .join("anor");
-        }
-
-        config.storage = Some(Storage { data_path });
+        let data_path = parse_storage_path(config_node);
+        config.storage = Some(StorageConfig { data_path });
     }
 
-    let map_key = "server";
+    let map_key = "api";
     if config_map.contains_key(map_key) {
         let config_node = &config_map[map_key];
         let listen_on = parse_listen_on(
             config_node,
-            DEFAULT_SERVER_LISTEN_ADDRESS,
-            DEFAULT_SERVER_LISTEN_PORT,
+            DEFAULT_API_SERVICE_LISTEN_ADDRESS,
+            DEFAULT_API_SERVICE_LISTEN_PORT,
         );
-        config.server = Some(Server { listen_on });
+        let enabled = parse_enabled(config_node).unwrap_or(DEFAULT_API_SERVICE_ENABLED);
+        config.api = Some(ApiConfig { listen_on, enabled });
     }
 
-    let map_key = "file_server";
+    let map_key = "http";
     if config_map.contains_key(map_key) {
         let config_node = &config_map[map_key];
         let listen_on = parse_listen_on(
             config_node,
-            DEFAULT_FILE_SERVER_LISTEN_ADDRESS,
-            DEFAULT_FILE_SERVER_LISTEN_PORT,
+            DEFAULT_HTTP_SERVICE_LISTEN_ADDRESS,
+            DEFAULT_HTTP_SERVICE_LISTEN_PORT,
         );
-        config.file_server = Some(FileServer { listen_on });
+        let enabled = parse_enabled(config_node).unwrap_or(DEFAULT_HTTP_SERVICE_ENABLED);
+        config.http = Some(HttpConfig { listen_on, enabled });
     }
 
     let map_key = "remote";
@@ -177,7 +179,7 @@ fn parse_storage_path(node: &HashMap<String, String>) -> PathBuf {
     PathBuf::from(storage_path)
 }
 
-fn parse_remote(node: &HashMap<String, String>) -> Remote {
+fn parse_remote(node: &HashMap<String, String>) -> RemoteConfig {
     let node_key = "nodes";
     let remote_nodes = if node.contains_key(node_key) {
         node[node_key]
@@ -202,13 +204,45 @@ fn parse_remote(node: &HashMap<String, String>) -> Remote {
         log::trace!("parsed: remote nodes: {:?}", nodes);
     }
 
-    Remote { nodes }
+    RemoteConfig { nodes }
+}
+
+fn parse_enabled(node: &HashMap<String, String>) -> Option<bool> {
+    let node_key = "enabled";
+    if node.contains_key(node_key) {
+        Some(node[node_key].parse().unwrap())
+    } else {
+        None
+    }
+}
+
+fn get_config_filename() -> &'static str {
+    if build_profile::debug_mode() {
+        if build_profile::is_cargo_test() {
+            DEFAULT_CONFIG_FILENAME_TEST
+        } else {
+            DEFAULT_CONFIG_FILENAME_DEBUG
+        }
+    } else {
+        DEFAULT_CONFIG_FILENAME_RELEASE
+    }
 }
 
 #[cfg(test)]
 mod test {
-    #[test]
-    fn test() {
+    use super::*;
 
+    #[test]
+    fn test_config() {
+        assert!(build_profile::is_cargo_test());
+        assert_eq!(get_config_filename(), DEFAULT_CONFIG_FILENAME_TEST);
+
+        let config = get_config();
+        let data_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("target")
+            .join("tmp")
+            .join("anor");
+        assert!(config.storage.is_some());
+        assert_eq!(config.storage.as_ref().unwrap().data_path, data_path);
     }
 }
