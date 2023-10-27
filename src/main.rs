@@ -1,5 +1,7 @@
+use anor::storage::Storage;
 use anor_common::utils::config;
 use anor_http::client::http_client;
+use anor_http::service::http_service;
 use core::time;
 use log::{log_enabled, Level};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -14,20 +16,16 @@ fn main() {
     let config = config::load();
 
     // open the data storage
-    // let storage = Storage::open_with_config(config.clone());
+    let storage = Storage::open_with_config(config.clone());
 
-    // start file server
-    let http_service_config = config.clone();
-
-    // start the storage api service
-
+    // prepare http service
     let http_service_ready = Arc::new(AtomicBool::new(false));
     let http_service_shutdown = Arc::new(AtomicBool::new(false));
-    let handle_http_service = anor_http::service::http_service::start_http_service(
-        http_service_config,
-        http_service_ready.clone(),
-        http_service_shutdown.clone(),
-    );
+    let http_service = http_service::HttpService::with_config(storage, config.clone());
+
+    // start the http service
+    let handle_http_service =
+        http_service.start(http_service_ready.clone(), http_service_shutdown.clone());
 
     // wait until service is ready
     while !http_service_ready.load(Ordering::SeqCst) {

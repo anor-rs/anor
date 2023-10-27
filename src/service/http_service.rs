@@ -1,51 +1,56 @@
+use anor::storage::Storage;
+use anor_common::utils::config::Config;
+use bytes::Bytes;
+use http_body_util::Full;
+use http_common::http_range::{self, HttpRange};
+use hyper::server::conn::http1;
+use hyper::service::service_fn;
+use hyper::{Method, Request, Response, Result, StatusCode};
+use hyper_util::rt::TokioIo;
+use log;
 use std::io::SeekFrom;
 use std::net::SocketAddr;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread::JoinHandle;
-
-use anor_common::utils::config::Config;
 use tokio::io::AsyncReadExt;
 use tokio::io::AsyncSeekExt;
 use tokio::net::TcpListener;
 use tokio::runtime::Runtime;
 
-use hyper::server::conn::http1;
-use hyper::service::service_fn;
-use hyper::{Method, Request, Response, Result, StatusCode};
-use hyper_util::rt::TokioIo;
-
-use bytes::Bytes;
-use http_body_util::Full;
-
-use log;
-
-use http_common::http_range::{self, HttpRange};
-
 // A simple type alias so as to DRY.
-type FileServerResult<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
+type HttpServiceResult<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
-pub fn start_http_service(
-    config: Arc<Config>,
-    service_ready: Arc<AtomicBool>,
-    service_shutdown: Arc<AtomicBool>,
-) -> JoinHandle<()> {
-    assert!(config.http.is_some());
-    let file_server_config = config.http.as_ref().unwrap();
-    assert!(!file_server_config.listen_on.is_empty());
-    let listen_on = file_server_config.listen_on[0];
+pub struct HttpService {
+    _storage: Storage,
+    config: Arc<Config>
+}
 
-    log::info!("Starting HTTP service...");
+impl HttpService {
+    pub fn with_config(_storage: Storage, config: Arc<Config>) -> Self {
+        assert!(config.http.is_some());
+        assert!(!config.http.as_ref().unwrap().listen_on.is_empty());
+        HttpService { _storage, config }
+    }
 
-    std::thread::spawn(move || {
-        let async_runtime = Runtime::new().unwrap();
-        async_runtime.block_on(async {
-            if let Err(err) = start(listen_on, service_ready, service_shutdown).await {
-                log::error!("HTTP service failed: {:?}", err);
-            }
-        });
-    })
+    pub fn start(&self, 
+        service_ready: Arc<AtomicBool>,
+        service_shutdown: Arc<AtomicBool>,
+    ) -> JoinHandle<()> {
+    
+        let listen_on = self.config.http.as_ref().unwrap().listen_on[0];
+        log::info!("Starting HTTP service...");
+    
+        std::thread::spawn(move || {
+            let async_runtime = Runtime::new().unwrap();
+            async_runtime.block_on(async {
+                if let Err(err) = start(listen_on, service_ready, service_shutdown).await {
+                    log::error!("HTTP service failed: {:?}", err);
+                }
+            });
+        })
+    }
 }
 
 async fn start(
@@ -144,7 +149,7 @@ async fn file_info(req: &Request<hyper::body::Incoming>) -> Result<Response<Full
     }
 }
 
-async fn get_file_len(filename: &Path) -> FileServerResult<u64> {
+async fn get_file_len(filename: &Path) -> HttpServiceResult<u64> {
     let file = tokio::fs::File::open(filename).await?;
     let metadata = file.metadata().await?;
     if metadata.is_file() {

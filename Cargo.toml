@@ -27,4 +27,5 @@ bytes = "1"
 
 http_common = { git = "https://github.com/sheroz/http_common.git" }
 
+anor = { git = "https://github.com/anor-rs/anor.git" }
 anor-common = { git = "https://github.com/anor-rs/anor-common.git" }

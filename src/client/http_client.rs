@@ -1,14 +1,12 @@
-use std::ops::Range;
-
 use bytes::Bytes;
 use http_body_util::{BodyExt, Empty};
+use http_common::http_range::{CompleteLength, HttpRange};
 use hyper::Request;
+use hyper_util::rt::TokioIo;
+use std::ops::Range;
 use tokio::io::{self, AsyncWriteExt as _};
 use tokio::net::TcpStream;
 use tokio::runtime::Runtime;
-
-use http_common::http_range::{HttpRange, CompleteLength};
-use hyper_util::rt::TokioIo;
 
 // A simple type alias so as to DRY.
 type HttpClientResult<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
