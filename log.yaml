@@ -4,7 +4,7 @@ appenders:
         encoder:
             pattern: "{d(%+)(utc)} [{f}:{L}] {h({l})} {m}{n}"
 root:
-    level: trace
+    level: info
     appenders:
         - stdout
 
@@ -14,3 +14,6 @@ loggers:
 
     anor::storage:
         level: debug
+
+    anor_api:
+        level: trace

@@ -1,3 +1,5 @@
+use super::storage_api::AnorStorageApi;
+use anor::storage::storage_item::StorageItem;
 use anor::storage::Storage;
 use anor_common::utils::config::Config;
 use log;
@@ -7,20 +9,16 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 
-use anor::storage::storage_item::StorageItem;
-
-use super::StorageApi;
-
-pub struct StorageApiService {
+pub struct ApiService {
     storage: Storage,
     config: Arc<Config>,
 }
 
-pub type AnorApiMutex<'a> = Arc<Mutex<StorageApiService>>;
+pub type AnorApiMutex<'a> = Arc<Mutex<ApiService>>;
 
-impl StorageApi for StorageApiService {
+impl AnorStorageApi for ApiService {
     fn with_config(storage: Storage, config: Arc<Config>) -> Self {
-        StorageApiService { storage, config }
+        ApiService { storage, config }
     }
 
     fn start(&self, flag_shutdown: Arc<AtomicBool>, flag_ready: Arc<AtomicBool>) {
@@ -91,10 +89,16 @@ fn handle_connection(mut stream: TcpStream, addr: SocketAddr, flag_shutdown: Arc
     let addr = stream.peer_addr().unwrap();
     while !flag_shutdown.load(Ordering::SeqCst) {
         let count = stream.read(&mut buf).unwrap();
-        log::debug!("Received bytes count from {} : {}", addr, count);
+        if log::log_enabled!(log::Level::Trace) {
+            log::trace!("Received bytes count from {} : {}", addr, count);
+        }
+
         let mut vec = buf.to_vec();
         vec.truncate(count);
         let msg = String::from_utf8(vec).unwrap();
-        log::debug!("Received message from {} : {}", addr, msg);
+
+        if log::log_enabled!(log::Level::Trace) {
+            log::trace!("Received message from {} : {}", addr, msg);
+        }
     }
 }
