@@ -19,16 +19,19 @@ mod test {
     use super::*;
 
     #[test]
-    fn substitute_test() {
-        let src = "${CARGO_MANIFEST_DIR}/target/tmp/anor";
-        let found = substitute(src);
+    fn substitute_string_test() {
+        let src = "**${CARGO_PKG_NAME}**";
+        assert_eq!(substitute(src), "**anor-common**");
+    }
 
-        use std::path::PathBuf;
-        let expected = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("target")
-            .join("tmp")
-            .join("anor");
+    #[test]
+    fn substitute_path_test() {
+        let src = "${CARGO_MANIFEST_DIR}/1/2/3";
+        let expected = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("1")
+            .join("2")
+            .join("3");
 
-        assert_eq!(found, expected.to_string_lossy());
+        assert_eq!(substitute(src), expected.to_string_lossy());
     }
 }
