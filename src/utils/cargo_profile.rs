@@ -1,7 +1,7 @@
-/// Build Profile
+/// Cargo build profile
 /// https://doc.rust-lang.org/cargo/reference/profiles.html
 #[derive(Debug, PartialEq)]
-pub enum BuildProfile {
+pub enum CargoProfile {
     /// cargo build --release
     Release,
 
@@ -10,6 +10,7 @@ pub enum BuildProfile {
 
     /// cargo test
     Test,
+
     // Bench,
     // Doc,
 }
@@ -24,34 +25,34 @@ pub fn debug_mode() -> bool {
 }
 
 /// Returns whether the build profile is test
-pub fn is_cargo_test() -> bool {
-    build_profile() == BuildProfile::Test
+pub fn is_profile_test() -> bool {
+    get_profile() == CargoProfile::Test
 }
 
-/// Returns a `BuildProfile` value according to the build
-pub fn build_profile() -> BuildProfile {
+/// Returns a `BuildProfile` value according to the cargo command
+pub fn get_profile() -> CargoProfile {
     if cfg!(test) {
-        return BuildProfile::Test;
+        return CargoProfile::Test;
     }
     if debug_mode() {
-        return BuildProfile::Dev;
+        return CargoProfile::Dev;
     }
 
-    BuildProfile::Release
+    CargoProfile::Release
 }
 
 #[cfg(test)]
 mod test {
-    use crate::utils::build_profile::*;
+    use super::*;
 
     #[test]
-    fn build_profile_test() {
-        assert_eq!(build_profile(), BuildProfile::Test);
+    fn get_profile_test() {
+        assert_eq!(get_profile(), CargoProfile::Test);
     }
 
     #[test]
-    fn is_build_profile_test_() {
-        assert!(is_cargo_test());
+    fn is_cargo_profile_test() {
+        assert!(is_profile_test());
     }
 
     #[test]

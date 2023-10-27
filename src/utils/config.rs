@@ -4,7 +4,7 @@ use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use super::{build_profile, envsubst};
+use super::{cargo_profile, envsubst};
 
 const DEFAULT_CONFIG_FILENAME_RELEASE: &str = "anor-config.yaml";
 const DEFAULT_CONFIG_FILENAME_DEBUG: &str = "anor-config.debug";
@@ -52,7 +52,7 @@ pub struct RemoteConfig {
     pub nodes: Vec<SocketAddr>,
 }
 
-pub fn get_config() -> Arc<Config> {
+pub fn load() -> Arc<Config> {
     let config_filename = get_config_filename();
     let mut config_file = std::fs::File::open(config_filename)
         .unwrap_or_else(|_| panic!("Could not open {} file.", config_filename));
@@ -63,7 +63,7 @@ pub fn get_config() -> Arc<Config> {
         panic!("{}", err);
     }
 
-    let config_substituted = envsubst::substitute(&config_content);
+    let config_substituted = envsubst::dollar_curly(&config_content);
 
     let config_map: HashMap<String, HashMap<String, String>> =
         serde_yaml::from_str(&config_substituted)
@@ -218,8 +218,8 @@ fn parse_enabled(node: &HashMap<String, String>) -> Option<bool> {
 }
 
 fn get_config_filename() -> &'static str {
-    if build_profile::debug_mode() {
-        if build_profile::is_cargo_test() {
+    if cargo_profile::debug_mode() {
+        if cargo_profile::is_profile_test() {
             DEFAULT_CONFIG_FILENAME_TEST
         } else {
             DEFAULT_CONFIG_FILENAME_DEBUG
@@ -235,13 +235,13 @@ mod test {
 
     #[test]
     fn config_file_test() {
-        assert!(build_profile::is_cargo_test());
+        assert!(cargo_profile::is_profile_test());
         assert_eq!(get_config_filename(), DEFAULT_CONFIG_FILENAME_TEST);
     }
 
     #[test]
     fn config_storage_test() {
-        let config = get_config();
+        let config = load();
         assert!(config.storage.is_some());
 
         let storage = config.storage.as_ref().unwrap();
@@ -254,7 +254,7 @@ mod test {
 
     #[test]
     fn config_api_test() {
-        let config = get_config();
+        let config = load();
         assert!(config.api.is_some());
 
         let api = config.api.as_ref().unwrap();
@@ -265,7 +265,7 @@ mod test {
 
     #[test]
     fn config_http_test() {
-        let config = get_config();
+        let config = load();
         assert!(config.http.is_some());
 
         let http = config.http.as_ref().unwrap();
@@ -276,7 +276,7 @@ mod test {
 
     #[test]
     fn config_remote_test() {
-        let config = get_config();
+        let config = load();
         assert!(config.remote.is_some());
 
         let remote = config.remote.as_ref().unwrap();

@@ -1,6 +1,6 @@
 use regex::Regex;
 
-pub fn substitute(src: &str) -> String {
+pub fn dollar_curly(src: &str) -> String {
     let mut result = src.to_string();
     let regex = Regex::new(r"\$\{(.*?)\}").unwrap();
 
@@ -19,19 +19,19 @@ mod test {
     use super::*;
 
     #[test]
-    fn substitute_string_test() {
+    fn dollar_curly_string_test() {
         let src = "**${CARGO_PKG_NAME}**";
-        assert_eq!(substitute(src), "**anor-common**");
+        assert_eq!(dollar_curly(src), "**anor-common**");
     }
 
     #[test]
-    fn substitute_path_test() {
+    fn dollar_curly_path_test() {
         let src = "${CARGO_MANIFEST_DIR}/1/2/3";
         let expected = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("1")
             .join("2")
             .join("3");
 
-        assert_eq!(substitute(src), expected.to_string_lossy());
+        assert_eq!(dollar_curly(src), expected.to_string_lossy());
     }
 }

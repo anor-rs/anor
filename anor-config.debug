@@ -43,5 +43,3 @@ redundancy:
   strategy: normal
   replica_min: 2
   replica_max: 5
-
-## end of configuration
