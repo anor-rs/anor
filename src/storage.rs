@@ -107,7 +107,7 @@ impl Drop for Storage {
 impl Storage {
     /// Opens a storage and loads persisted data
     pub fn open() -> Self {
-        let config = config::get_config();
+        let config = config::load();
         Self::open_with_config(config)
     }
 
