@@ -234,16 +234,53 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_config() {
+    fn config_file_test() {
         assert!(build_profile::is_cargo_test());
         assert_eq!(get_config_filename(), DEFAULT_CONFIG_FILENAME_TEST);
+    }
 
+    #[test]
+    fn config_storage_test() {
         let config = get_config();
+        assert!(config.storage.is_some());
+
+        let storage = config.storage.as_ref().unwrap();
         let data_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("target")
             .join("tmp")
             .join("anor");
-        assert!(config.storage.is_some());
-        assert_eq!(config.storage.as_ref().unwrap().data_path, data_path);
+        assert_eq!(storage.data_path, data_path);
+    }
+
+    #[test]
+    fn config_api_test() {
+        let config = get_config();
+        assert!(config.api.is_some());
+
+        let api = config.api.as_ref().unwrap();
+        assert_eq!(api.listen_on.len(), 1);
+        assert_eq!(api.listen_on[0], "127.0.0.1:9191".parse().unwrap());
+        assert!(api.enabled);
+    }
+
+    #[test]
+    fn config_http_test() {
+        let config = get_config();
+        assert!(config.http.is_some());
+
+        let http = config.http.as_ref().unwrap();
+        assert_eq!(http.listen_on.len(), 1);
+        assert_eq!(http.listen_on[0], "127.0.0.1:8181".parse().unwrap());
+        assert!(http.enabled);
+    }
+
+    #[test]
+    fn config_remote_test() {
+        let config = get_config();
+        assert!(config.remote.is_some());
+
+        let remote = config.remote.as_ref().unwrap();
+        assert_eq!(remote.nodes.len(), 1);
+        assert_eq!(remote.nodes[0], "127.0.0.1:9191".parse().unwrap());
     }
 }
