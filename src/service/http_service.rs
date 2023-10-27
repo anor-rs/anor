@@ -26,10 +26,10 @@ use http_common::http_range::{self, HttpRange};
 // A simple type alias so as to DRY.
 type FileServerResult<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
-pub fn start_file_server(
+pub fn start_http_service(
     config: Arc<Config>,
-    flag_ready: Arc<AtomicBool>,
-    flag_shutdown: Arc<AtomicBool>,
+    service_ready: Arc<AtomicBool>,
+    service_shutdown: Arc<AtomicBool>,
 ) -> JoinHandle<()> {
     assert!(config.http.is_some());
     let file_server_config = config.http.as_ref().unwrap();
@@ -41,7 +41,7 @@ pub fn start_file_server(
     std::thread::spawn(move || {
         let async_runtime = Runtime::new().unwrap();
         async_runtime.block_on(async {
-            if let Err(err) = start(listen_on, flag_ready, flag_shutdown).await {
+            if let Err(err) = start(listen_on, service_ready, service_shutdown).await {
                 log::error!("HTTP service failed: {:?}", err);
             }
         });
@@ -50,16 +50,16 @@ pub fn start_file_server(
 
 async fn start(
     listen_on: SocketAddr,
-    flag_ready: Arc<AtomicBool>,
-    flag_shutdown: Arc<AtomicBool>,
+    service_ready: Arc<AtomicBool>,
+    service_shutdown: Arc<AtomicBool>,
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
     let listener = TcpListener::bind(listen_on).await?;
 
-    flag_ready.store(true, Ordering::SeqCst);
+    service_ready.store(true, Ordering::SeqCst);
 
     log::info!("HTTP service running on http://{}", listen_on);
 
-    while !flag_shutdown.load(Ordering::SeqCst) {
+    while !service_shutdown.load(Ordering::SeqCst) {
         let (stream, _) = listener.accept().await?;
         tokio::task::spawn(async move {
             let io = TokioIo::new(stream);
