@@ -12,7 +12,7 @@ fn main() {
 
     log::info!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
 
-    let config = config::get_config();
+    let config = config::load();
 
     // open the data storage
     let storage = Storage::open_with_config(config.clone());

@@ -9,7 +9,7 @@ root:
         - stdout
 
 loggers:
-    anor::utils::config:
+    anor_common::utils::config:
         level: debug
 
     anor::storage:
