@@ -9,8 +9,8 @@ root:
         - stdout
 
 loggers:
-    anor::utils::config:
-        level: info
+    anor_common:
+        level: debug
 
     anor::storage:
-        level: info
+        level: trace
