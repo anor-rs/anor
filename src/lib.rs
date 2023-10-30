@@ -4,4 +4,7 @@
 //!
 //! **Development**: this project already has milestone releases, but is still under active development, you should not expect full stability yet.
 
-pub mod utils;
+pub mod cargo_profile;
+pub mod config;
+pub mod envsubst;
+pub mod threadpool;
