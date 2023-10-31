@@ -69,8 +69,9 @@ impl ThreadPool {
         self.sender.as_ref().unwrap().send(job).unwrap();
     }
 
-    pub fn join(&mut self) {
-        unimplemented!()
+    /// blocks the executor and waits for the completion of active jobs
+    pub fn wait_for_completion(&self) {
+        todo!()
     }
 }
 
@@ -115,21 +116,27 @@ pub mod test {
         use std::sync::atomic::{AtomicU64, Ordering};
 
         let total = Arc::new(AtomicU64::new(0));
-        let tasks: Vec<_> = (0..100).collect();
-        let job_task = |n: u64| {thread::sleep(Duration::from_millis(20)); n*n};
-        let pool = ThreadPool::new(4);
 
-        for task in tasks {
-            let total_clone = total.clone();
-            pool.execute(move || {
-                let product = job_task(task);
-                total_clone.fetch_add(product, Ordering::SeqCst);
-            });
+        // need a scope to drop the pool and join threads
+        {
+            let pool = ThreadPool::new(4);
+            let task = |n: u64| {
+                thread::sleep(Duration::from_millis(20));
+                n * n
+            };
+
+            for n in 0..100 {
+                let total_clone = total.clone();
+                pool.execute(move || {
+                    let product = task(n);
+                    total_clone.fetch_add(product, Ordering::SeqCst);
+                });
+            }
         }
-
+        
         // wait for executed threads complete
-        // pool.join();
-        drop(pool);
+        // pool.wait_for_completion();
+        // drop(pool);
 
         assert_eq!(total.load(Ordering::SeqCst), 328350);
     }
