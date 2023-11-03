@@ -21,7 +21,7 @@ mod test {
     #[test]
     fn dollar_curly_string_test() {
         let src = "**${CARGO_PKG_NAME}**";
-        assert_eq!(dollar_curly(src), "**anor-common**");
+        assert_eq!(dollar_curly(src), "**anor-utils**");
     }
 
     #[test]
