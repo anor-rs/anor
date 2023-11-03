@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.4 (2023-11-03)
+
+* updated readme
+
 ## 0.1.3 (2023-11-03)
 
 * tests fixed
