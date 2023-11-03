@@ -8,7 +8,7 @@ documentation = "https://docs.rs/anor-api"
 readme = "README.md"
 repository = "https://github.com/anor-rs/anor"
 license = "MIT"
-keywords = ["api", "server", "network", "data", "store", "cache"]
+keywords = ["api", "server", "network", "data", "cache"]
 categories = ["data-structures", "caching", "database", "network-programming"]
 
 [dependencies]
