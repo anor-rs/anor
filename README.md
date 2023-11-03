@@ -13,4 +13,4 @@ The open-source data access and storage platform
 
 ## Project Stage
 
-**Development**: this project has some component releases but is still under active development, you should not expect full stability yet.
+**Development**: this project is under active development, you should not expect stability yet.
