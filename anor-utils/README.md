@@ -3,7 +3,7 @@
 [![crates.io](https://img.shields.io/crates/v/anor-common)](https://crates.io/crates/anor-common)
 [![docs](https://img.shields.io/docsrs/anor-common)](https://docs.rs/anor-common)
 [![build & test](https://github.com/anor-rs/anor/actions/workflows/ci.yml/badge.svg)](https://github.com/anor-rs/anor/actions/workflows/ci.yml)
-[![MIT](https://img.shields.io/github/license/anor-rs/anor-common)](https://github.com/anor-rs/anor-common/tree/main/LICENSE.txt)
+[![MIT](https://img.shields.io/github/license/anor-rs/anor)](https://github.com/anor-rs/anor/tree/main/LICENSE.txt)
 
 ## Project Stage
 
