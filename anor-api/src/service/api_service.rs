@@ -6,8 +6,8 @@ use std::sync::{Arc, Mutex};
 
 use log;
 
-use anor::storage::{storage_item::StorageItem, Storage};
-use anor_common::{config::Config, threadpool::ThreadPool};
+use anor_storage::storage::{storage_item::StorageItem, Storage};
+use anor_utils::{config::Config, threadpool::ThreadPool};
 
 pub trait ApiService {
     fn with_config(storage: Storage, config: Arc<Config>) -> Self;

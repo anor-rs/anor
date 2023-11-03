@@ -1,5 +1,5 @@
-use anor::storage::storage_item::StorageItem;
-use anor_common::config::Config;
+use anor_storage::storage::storage_item::StorageItem;
+use anor_utils::config::Config;
 use std::io::prelude::*;
 use std::net::TcpStream;
 use std::sync::Arc;

@@ -1,4 +1,4 @@
-use anor_common::config::{self, Config};
+use anor_utils::config::{self, Config};
 use fs2::FileExt;
 use std::{
     collections::{HashMap, HashSet},

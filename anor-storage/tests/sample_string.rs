@@ -1,6 +1,6 @@
 #[test]
 fn sample_string() {
-    use anor::storage::{storage_item::*, Storage};
+    use anor_storage::storage::{storage_item::*, Storage};
 
     let key = "my_string";
     let sample_string = String::from("abc");

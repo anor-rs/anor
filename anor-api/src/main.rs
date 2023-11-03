@@ -5,13 +5,13 @@ use std::{
     time::Instant,
 };
 
-use anor::storage::Storage;
+use anor_storage::storage::Storage;
 use anor_api::{
     client::api_client::{SocketClient, StorageApiClient},
     service::api_service::{ApiService, StorageApi},
 };
 
-use anor_common::config;
+use anor_utils::config;
 
 fn main() {
     let launch_start = Instant::now();

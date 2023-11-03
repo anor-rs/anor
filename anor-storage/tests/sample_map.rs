@@ -1,6 +1,6 @@
 #[test]
 fn sample_map() {
-    use anor::storage::{storage_item::*, Storage};
+    use anor_storage::storage::{storage_item::*, Storage};
     use std::collections::HashMap;
 
     let key = "my_map";

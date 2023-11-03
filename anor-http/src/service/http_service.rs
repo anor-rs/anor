@@ -1,5 +1,5 @@
-use anor::storage::Storage;
-use anor_common::utils::config::Config;
+use anor_storage::storage::Storage;
+use anor_utils::config::Config;
 use bytes::Bytes;
 use http_body_util::Full;
 use http_common::http_range::{self, HttpRange};

@@ -17,8 +17,8 @@ log4rs = "1.2"
 prost = "0.12"
 bytes = "1.5.0"
 
-anor = { git = "https://github.com/anor-rs/anor.git" }
-anor-common = { git = "https://github.com/anor-rs/anor-common.git" }
+anor-utils = "0.1"
+anor-storage = { path = "../anor-storage"  }
 
 [build-dependencies]
 prost-build = "0.12.1"

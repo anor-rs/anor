@@ -1,5 +1,5 @@
-use anor::storage::Storage;
-use anor_common::utils::config;
+use anor_storage::storage::Storage;
+use anor_utils::config;
 use anor_http::client::http_client;
 use anor_http::service::http_service;
 use core::time;
