@@ -1,0 +1,45 @@
+# anor configuration file
+
+# storage settings
+storage:
+  data_path: "/tmp/anor"
+
+# api service settings
+api:
+  name: anor1
+  description: "Anor API Service"
+  id: anor1@anor
+  access_token: face0aa08c29eb27aa3e0ebb7fe9d9a678a9caecc1f7b886e35bc16b1c266f42
+  listen_addresses: 127.0.0.1
+  listen_port: 9191
+  connections_max: 20
+  threads_max: 4
+  ram_max: 512M
+  disk_max: 2G
+  enabled: true
+
+# http service settings
+http:
+  description: "Anor HTTP Service"
+  listen_addresses: 127.0.0.1
+  listen_port: 8181
+  enabled: true
+
+# pool of remote server nodes
+remote:
+  nodes: 127.0.0.1:9191
+
+# client settings
+client:
+  name: test
+  id: test1@file_api
+  access_token: bbc5f7280aa440648d2ca6023610956da401739283ec77593492aa385f256dec
+
+# redundancy settings
+redundancy:
+  # strategy: normal   - replicate item on 'redundancy_replica_min' nodes
+  # strategy: maximum  - replicate item on 'redundancy_replica_max' nodes if there are enough resources 
+  # strategy: paranoid - replicate item on all nodes if there are enough resources
+  strategy: normal
+  replica_min: 2
+  replica_max: 5
