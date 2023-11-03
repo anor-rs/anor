@@ -18,7 +18,7 @@ prost = "0.12"
 bytes = "1.5.0"
 
 anor-utils = "0.1"
-anor-storage = { path = "../anor-storage"  }
+anor-storage = "0.1"
 
 [build-dependencies]
 prost-build = "0.12.1"

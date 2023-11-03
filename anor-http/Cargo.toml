@@ -28,4 +28,4 @@ bytes = "1"
 http_common = { git = "https://github.com/sheroz/http_common.git" }
 
 anor-utils = "0.1"
-anor-storage = { path = "../anor-storage" }
+anor-storage = "0.1"
