@@ -2,8 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
-## Unreleased
+## 0.1.2 (2023-11-03)
 
+* project moved into anor workspace
 * added threadpool module
 * moved modules to the root scope
 

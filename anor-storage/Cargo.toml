@@ -1,10 +1,10 @@
 [package]
-name = "anor"
-version = "0.1.2"
+name = "anor-storage"
+version = "0.1.3"
 edition = "2021"
 authors = ["Sheroz Khaydarov"]
 description = "Anor In-Memory Data Storage"
-documentation = "https://docs.rs/anor"
+documentation = "https://docs.rs/anor-storage"
 readme = "README.md"
 repository = "https://github.com/anor-rs/anor"
 license = "MIT"

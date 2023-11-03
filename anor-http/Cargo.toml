@@ -1,12 +1,12 @@
 [package]
 name = "anor-http"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Sheroz Khaydarov"]
 description = "Anor HTTP Service"
 documentation = "https://docs.rs/anor-http"
 readme = "README.md"
-repository = "https://github.com/anor-rs/anor-http"
+repository = "https://github.com/anor-rs/anor"
 license = "MIT"
 keywords = ["data", "store", "cache"]
 categories = ["data-structures", "caching", "database", "filesystem"]

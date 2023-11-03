@@ -1,12 +1,12 @@
 [package]
-name = "anor-common"
-version = "0.1.1"
+name = "anor-utils"
+version = "0.1.0"
 edition = "2021"
 authors = ["Sheroz Khaydarov"]
-description = "Anor Common Utilities"
-documentation = "https://docs.rs/anor-common"
+description = "Anor Utilities"
+documentation = "https://docs.rs/anor-utils"
 readme = "README.md"
-repository = "https://github.com/anor-rs/anor-common"
+repository = "https://github.com/anor-rs/anor"
 license = "MIT"
 keywords = ["data", "store", "cache"]
 categories = ["data-structures", "caching", "database"]

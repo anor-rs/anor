@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    "anor-storage",
+    "anor-api",
+    "anor-http",
+    "anor-utils",
+]

@@ -2,8 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
-## Unreleased
+## 0.1.3 (2023-11-03)
 
+* project moved into anor workspace
 * configuration support per build profile
 * global lock usage simplified
 
