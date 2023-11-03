@@ -1,44 +1,29 @@
 # Roadmap
 
-1. Data Storage
+1. Storage
     - Storing: file, blob, json, xml, arrays, set, map, primitive types
     - Metafields: tags, descriptions, metadata
   
 2. API Service (TCP)
     - basic functionality
-    - async support
 
 3. API Client (TCP)
     - basic functionality
-    - async support
 
-4. Configuration
-   - server and client sections
-
-5. Logging
-    - basic logging
-
-6. HTTP Service
+4. HTTP Service
     - basic file storage
-    - async support
     - streaming (seeking and reading data at given position)
         - support for partial requests (Content-Range)
         - support for If-Range, If-Modified-Since, If-None-Match, Last-Modified, Etag
 
-7. Authentification and Authorization
+5. Authentification and Authorization
     - support for JWT
     - support for Fine-Grained Access Control
 
-8. Remote collections
-    - HashSet
-    - HashMap
-    - Vec
-    - VecDeque
-
-9. Scaling
-    - cluster heartbeat
+6. Scaling
     - consistent hashing
-    - easy scaling
+    - cluster health check / heartbeats
+    - support for easy scaling
       - support for built-in configuration service in nodes
       - support for auto replicating of configuration parameters in cluster nodes
       - support for plug & play in adding a new node into cluster and re-configurating of existing nodes
@@ -48,22 +33,25 @@
         - each client request includes a config_id parameter
         - server node will analyze the received config_id and may respond with updated configuration settings
       - clients and nodes use weighted graphs to optimize node/peer selection and other network operations
-10. Caching
+
+7. Caching
     - client-side and server-side caching support
     - cache evictions policies: LRU/LFU
 
-11. File Storage Spaces
+8. File Storage Spaces
     - support for folders
     - support for path
 
-12. Collections
-    - Socket API
-    - REST API
-
-13. FFI Bindings
+9. FFI Bindings
     - Go
     - Ruby
     - Python
+
+10. Remote Collections
+    - HashSet
+    - HashMap
+    - Vec
+    - VecDeque
 
 ## Notes
 
