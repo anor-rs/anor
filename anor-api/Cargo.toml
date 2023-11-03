@@ -17,8 +17,8 @@ log4rs = "1.2"
 prost = "0.12"
 bytes = "1.5.0"
 
-anor-utils = "0.1"
-anor-storage = "0.1"
+anor-utils = { path = "../anor-utils"}
+anor-storage = { path = "../anor-storage"}
 
 [build-dependencies]
 prost-build = "0.12.1"

@@ -21,4 +21,4 @@ serde_yaml = "0.9"
 bincode = "2.0.0-rc.3"
 fs2 = "0.4"
 
-anor-utils = "0.1"
+anor-utils = { path = "../anor-utils"}
