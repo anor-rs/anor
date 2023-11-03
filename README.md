@@ -5,7 +5,7 @@
 
 The open-source data access and storage platform
 
-## Anor Components
+## Components
 
 * [In-Memory Data Storage](/anor-storage)
 * [API Service](/anor-api)
