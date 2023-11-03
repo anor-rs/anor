@@ -1,24 +1,29 @@
-use anor_common::utils::config::Config;
+use anor::storage::storage_item::StorageItem;
+use anor_common::config::Config;
 use std::io::prelude::*;
 use std::net::TcpStream;
 use std::sync::Arc;
 
-pub trait TcpClient {
+pub trait SocketClient {
     fn with_config(config: Arc<Config>) -> Self;
     fn connect(&mut self) -> std::io::Result<()>;
     fn disconnect(&mut self) -> std::io::Result<()>;
-    fn set_item(&mut self, key: String) -> std::io::Result<()>;
-    fn get_item(&mut self, key: String) -> std::io::Result<()>;
-    fn remove_item(&self, key: String) -> bool;
+    fn insert(&self, storage_item: StorageItem);
+    fn update(&mut self, key: &str, storage_item: StorageItem) -> std::io::Result<()>;
+    fn get(&mut self, key: &str) -> std::io::Result<StorageItem>;
+    fn remove(&self, key: &str) -> bool;
+    fn keys(&self) -> Vec<String>;
+    fn clear(&self);
+    fn flush(&self);
 }
-pub struct ApiClient {
+pub struct StorageApiClient {
     stream: Option<TcpStream>,
     config: Arc<Config>,
 }
 
-impl TcpClient for ApiClient {
+impl SocketClient for StorageApiClient {
     fn with_config(config: Arc<Config>) -> Self {
-        ApiClient {
+        StorageApiClient {
             stream: None,
             config,
         }
@@ -48,6 +53,7 @@ impl TcpClient for ApiClient {
         Ok(())
     }
 
+/*
     fn set_item(&mut self, key: String) -> std::io::Result<()> {
         let stream = self.stream.as_mut().unwrap();
         stream.write_all(key.as_bytes())?;
@@ -63,8 +69,33 @@ impl TcpClient for ApiClient {
         stream.read_exact(&mut buf)?;
         Ok(())
     }
+*/
 
-    fn remove_item(&self, _key: String) -> bool {
-        true
+    fn insert(&self, storage_item: StorageItem) {
+        todo!()
+    }
+
+    fn update(&mut self, key: &str, storage_item: StorageItem) -> std::io::Result<()> {
+        todo!()
+    }
+
+    fn get(&mut self, key: &str) -> std::io::Result<StorageItem> {
+        todo!()
+    }
+
+    fn remove(&self, key: &str) -> bool {
+        todo!()
+    }
+
+    fn keys(&self) -> Vec<String> {
+        vec![]
+    }
+
+    fn clear(&self) {
+        todo!()
+    }
+
+    fn flush(&self) {
+        todo!()
     }
 }

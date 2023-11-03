@@ -1,50 +1,64 @@
-use super::storage_api::AnorStorageApi;
-use anor::storage::storage_item::StorageItem;
-use anor::storage::Storage;
-use anor_common::utils::config::Config;
-use log;
 use std::io::prelude::*;
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
-use std::thread::{self, JoinHandle};
 
-pub struct ApiService {
+use log;
+
+use anor::storage::{storage_item::StorageItem, Storage};
+use anor_common::{config::Config, threadpool::ThreadPool};
+
+pub trait ApiService {
+    fn with_config(storage: Storage, config: Arc<Config>) -> Self;
+    fn start(&self, server_shutdown: Arc<AtomicBool>, signal_server_ready: Sender<()>) -> Result<(), String>;
+    fn stop(&self);
+    fn keys(&self) -> Vec<String>;
+    fn set_item(&self, key: &str, item: StorageItem) -> bool;
+    fn get_item(&self, key: &str) -> Option<StorageItem>;
+    fn remove_item(&self, key: &str) -> bool;
+}
+
+pub struct StorageApi {
     storage: Storage,
     config: Arc<Config>,
 }
 
-pub type AnorApiMutex<'a> = Arc<Mutex<ApiService>>;
+pub type AnorApiMutex<'a> = Arc<Mutex<StorageApi>>;
 
-impl AnorStorageApi for ApiService {
+impl ApiService for StorageApi {
     fn with_config(storage: Storage, config: Arc<Config>) -> Self {
-        ApiService { storage, config }
+        StorageApi { storage, config }
     }
 
-    fn start(&self, flag_shutdown: Arc<AtomicBool>, flag_ready: Arc<AtomicBool>) {
+    fn start(&self, shutdown: Arc<AtomicBool>, signal_ready_sender: Sender<()>) -> Result<(), String> {
         assert!(self.config.api.is_some());
         let config_server = self.config.api.as_ref().unwrap();
         assert!(!config_server.listen_on.is_empty());
         let listen_on = config_server.listen_on[0];
 
         let listener = TcpListener::bind(listen_on).unwrap();
-        flag_ready.store(true, Ordering::SeqCst);
+
+        // send the ready signal
+        if let Err(err) = signal_ready_sender.send(()) {
+            return Err(err.to_string());
+        }
 
         log::info!(
-            "Anor Storage API service started listening on {} ...",
+            "Anor Storage API service listening on {} ...",
             listen_on
         );
         // listener.set_nonblocking(true).unwrap();
 
-        // todo: use thread pooling
-        let mut handles = Vec::<JoinHandle<()>>::new();
-        while !flag_shutdown.load(Ordering::SeqCst) {
+        let pool = ThreadPool::new(2);
+
+        while !shutdown.load(Ordering::SeqCst) {
             match listener.accept() {
                 Ok((stream, addr)) => {
-                    let connection_shutdown = flag_shutdown.clone();
-                    let handle =
-                        thread::spawn(move || handle_connection(stream, addr, connection_shutdown));
-                    handles.push(handle);
+                    let shutdown_clone = shutdown.clone();
+                    pool.execute(move || {
+                        handle_connection(stream, addr, shutdown_clone);
+                    });
                 }
                 /*
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
@@ -58,9 +72,7 @@ impl AnorStorageApi for ApiService {
             }
         }
 
-        for handle in handles {
-            handle.join().unwrap();
-        }
+        Ok(())
     }
 
     fn stop(&self) {}
@@ -83,11 +95,11 @@ impl AnorStorageApi for ApiService {
     }
 }
 
-fn handle_connection(mut stream: TcpStream, addr: SocketAddr, flag_shutdown: Arc<AtomicBool>) {
+fn handle_connection(mut stream: TcpStream, addr: SocketAddr, shutdown: Arc<AtomicBool>) {
     log::debug!("Client connected: {}", addr);
     let mut buf = [0; 1024];
     let addr = stream.peer_addr().unwrap();
-    while !flag_shutdown.load(Ordering::SeqCst) {
+    while !shutdown.load(Ordering::SeqCst) {
         let count = stream.read(&mut buf).unwrap();
         if log::log_enabled!(log::Level::Trace) {
             log::trace!("Received bytes count from {} : {}", addr, count);

@@ -1,0 +1,6 @@
+syntax = "proto3";
+package anor_service_protobuf;
+
+message Keys {
+  repeated string key = 1;
+}

@@ -14,6 +14,11 @@ categories = ["data-structures", "caching", "database", "network-programming"]
 [dependencies]
 log = "0.4"
 log4rs = "1.2"
+prost = "0.12"
+bytes = "1.5.0"
 
 anor = { git = "https://github.com/anor-rs/anor.git" }
 anor-common = { git = "https://github.com/anor-rs/anor-common.git" }
+
+[build-dependencies]
+prost-build = "0.12.1"
