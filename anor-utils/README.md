@@ -1,4 +1,4 @@
-# Anor Common Utilities
+# Anor Utilities
 
 [![crates.io](https://img.shields.io/crates/v/anor-common)](https://crates.io/crates/anor-common)
 [![docs](https://img.shields.io/docsrs/anor-common)](https://docs.rs/anor-common)
