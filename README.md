@@ -8,12 +8,16 @@ The open-source data access and storage platform
 ## Components
 
 * [In-Memory Data Storage](/anor-storage)
-  * In-memory key-value data store, currently supports point-in-time, snapshot-based persistence in local disk.
+  * In-memory key-value data storage, currently supports point-in-time, snapshot-based persistence in local disk.
   * Please take a look at [samples](/anor-storage/tests).
 * [API Service](/anor-api)
   * under development
 * [HTTP Service](/anor-http)
   * under development
+
+## Documentation
+
+Documentation and other resources: [docs](/docs)
 
 ## Project Stage
 
