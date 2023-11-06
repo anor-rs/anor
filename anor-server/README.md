@@ -5,7 +5,7 @@
 [![build & test](https://github.com/anor-rs/anor/actions/workflows/ci.yml/badge.svg)](https://github.com/anor-rs/anor/actions/workflows/ci.yml)
 [![MIT](https://img.shields.io/github/license/anor-rs/anor)](https://github.com/anor-rs/anor/tree/main/LICENSE.txt)
 
-The server component for launching API and HTTP services
+The standalone server component for launching API and HTTP services for [Anor](https://github.com/anor-rs)
 
 ## Project Stage
 
