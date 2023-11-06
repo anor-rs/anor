@@ -4,5 +4,6 @@ members = [
     "anor-storage",
     "anor-api",
     "anor-http",
+    "anor-server",
     "anor-utils",
 ]
