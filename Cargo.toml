@@ -1,9 +1,3 @@
 [workspace]
+members = ["anor-storage", "anor-api", "anor-http", "anor-utils", "anor-server"]
 resolver = "2"
-members = [
-    "anor-storage",
-    "anor-api",
-    "anor-http",
-    "anor-server",
-    "anor-utils",
-]
