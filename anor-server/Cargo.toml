@@ -1,0 +1,22 @@
+[package]
+name = "anor-server"
+version = "0.1.1"
+edition = "2021"
+authors = ["Sheroz Khaydarov"]
+description = "Anor Server"
+documentation = "https://docs.rs/anor-server"
+readme = "README.md"
+repository = "https://github.com/anor-rs/anor"
+license = "MIT"
+keywords = ["data", "store", "cache", "server", "api", "network"]
+categories = ["data-structures", "caching", "database", "filesystem"]
+
+[dependencies]
+log = "0.4"
+log4rs = "1.2"
+
+anor-storage = { path = "../anor-storage"}
+anor-api = { path = "../anor-api"}
+anor-http = { path = "../anor-http"}
+anor-utils = { path = "../anor-utils"}
+

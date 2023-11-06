@@ -5,6 +5,8 @@ use std::{
     time::Instant,
 };
 
+use anor_http::client::http_client;
+use anor_http::service::http_service;
 use anor_storage::storage::Storage;
 use anor_api::{
     client::api_client::{SocketClient, StorageApiClient},
@@ -14,6 +16,10 @@ use anor_api::{
 use anor_utils::config;
 
 fn main() {
+    start_api_server();
+}
+
+fn start_api_server() {
     let launch_start = Instant::now();
 
     log4rs::init_file("log.yaml", Default::default()).unwrap();
@@ -84,4 +90,44 @@ fn main() {
     api_service_handler.join().unwrap();
 
     log::info!("Anor Storage API service is shutdown successfully.");
+}
+
+fn _start_http_server() {
+
+    let config = config::load();
+
+    // open the data storage
+    let storage = Storage::open_with_config(config.clone());
+
+    // prepare http service
+    let (http_service_ready_sender, http_service_ready_receiver) = channel();
+
+    let http_service_shutdown = Arc::new(AtomicBool::new(false));
+    let http_service = http_service::HttpService::with_config(storage, config.clone());
+
+    // start the http service
+    let handle_http_service =
+        http_service.start(http_service_ready_sender, http_service_shutdown.clone());
+
+    // wait for the readiness of http service
+    if let Err(err) = http_service_ready_receiver.recv() {
+        log::error!("{}", err);
+        panic!("{}", err);
+    }
+
+    // try to access the service by http client
+    http_client::get_file_info("http://127.0.0.1:8181/LICENSE");
+    http_client::get_file("http://127.0.0.1:8181/LICENSE");
+
+    let range = 48..482;
+    http_client::get_file_in_range("http://127.0.0.1:8181/LICENSE", Some(range));
+
+    let range = 2000..2100;
+    http_client::get_file_in_range("http://127.0.0.1:8181/LICENSE", Some(range));
+
+    // shutdown the HTTP service
+    // http_service_shutdown.store(true, Ordering::SeqCst);
+
+    handle_http_service.join().unwrap();
+    log::info!("Anor HTTP service is shutdown successfully.");
 }

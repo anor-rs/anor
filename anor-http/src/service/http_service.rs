@@ -1,17 +1,8 @@
-use anor_storage::storage::Storage;
-use anor_utils::config::Config;
-use bytes::Bytes;
-use http_body_util::Full;
-use http_common::http_range::{self, HttpRange};
-use hyper::server::conn::http1;
-use hyper::service::service_fn;
-use hyper::{Method, Request, Response, Result, StatusCode};
-use hyper_util::rt::TokioIo;
-use log;
 use std::io::SeekFrom;
 use std::net::SocketAddr;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::Sender;
 use std::sync::Arc;
 use std::thread::JoinHandle;
 use tokio::io::AsyncReadExt;
@@ -19,12 +10,25 @@ use tokio::io::AsyncSeekExt;
 use tokio::net::TcpListener;
 use tokio::runtime::Runtime;
 
+use log;
+
+use bytes::Bytes;
+use http_body_util::Full;
+use hyper::server::conn::http1;
+use hyper::service::service_fn;
+use hyper::{Method, Request, Response, Result, StatusCode};
+use hyper_util::rt::TokioIo;
+
+use anor_storage::storage::Storage;
+use anor_utils::config::Config;
+use http_common::http_range::{self, HttpRange};
+
 // A simple type alias so as to DRY.
 type HttpServiceResult<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
 pub struct HttpService {
     _storage: Storage,
-    config: Arc<Config>
+    config: Arc<Config>,
 }
 
 impl HttpService {
@@ -34,18 +38,20 @@ impl HttpService {
         HttpService { _storage, config }
     }
 
-    pub fn start(&self, 
-        service_ready: Arc<AtomicBool>,
-        service_shutdown: Arc<AtomicBool>,
+    pub fn start(
+        &self,
+        http_service_ready_sender: Sender<()>,
+        http_service_shutdown: Arc<AtomicBool>,
     ) -> JoinHandle<()> {
-    
         let listen_on = self.config.http.as_ref().unwrap().listen_on[0];
         log::info!("Starting HTTP service...");
-    
+
         std::thread::spawn(move || {
             let async_runtime = Runtime::new().unwrap();
             async_runtime.block_on(async {
-                if let Err(err) = start(listen_on, service_ready, service_shutdown).await {
+                if let Err(err) =
+                    start(listen_on, http_service_ready_sender, http_service_shutdown).await
+                {
                     log::error!("HTTP service failed: {:?}", err);
                 }
             });
@@ -55,16 +61,19 @@ impl HttpService {
 
 async fn start(
     listen_on: SocketAddr,
-    service_ready: Arc<AtomicBool>,
-    service_shutdown: Arc<AtomicBool>,
+    http_service_ready_sender: Sender<()>,
+    http_service_shutdown: Arc<AtomicBool>,
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
     let listener = TcpListener::bind(listen_on).await?;
 
-    service_ready.store(true, Ordering::SeqCst);
+    // send the ready signal
+    if let Err(err) = http_service_ready_sender.send(()) {
+        return Err(err.to_string().into());
+    }
 
     log::info!("HTTP service running on http://{}", listen_on);
 
-    while !service_shutdown.load(Ordering::SeqCst) {
+    while !http_service_shutdown.load(Ordering::SeqCst) {
         let (stream, _) = listener.accept().await?;
         tokio::task::spawn(async move {
             let io = TokioIo::new(stream);
