@@ -11,7 +11,11 @@ use anor_utils::{config::Config, threadpool::ThreadPool};
 
 pub trait ApiService {
     fn with_config(storage: Storage, config: Arc<Config>) -> Self;
-    fn start(&self, server_shutdown: Arc<AtomicBool>, signal_server_ready: Sender<()>) -> Result<(), String>;
+    fn start(
+        &self,
+        server_shutdown: Arc<AtomicBool>,
+        signal_server_ready: Sender<()>,
+    ) -> Result<(), String>;
     fn stop(&self);
     fn keys(&self) -> Vec<String>;
     fn set_item(&self, key: &str, item: StorageItem) -> bool;
@@ -31,7 +35,11 @@ impl ApiService for StorageApi {
         StorageApi { storage, config }
     }
 
-    fn start(&self, shutdown: Arc<AtomicBool>, signal_ready_sender: Sender<()>) -> Result<(), String> {
+    fn start(
+        &self,
+        shutdown: Arc<AtomicBool>,
+        signal_ready_sender: Sender<()>,
+    ) -> Result<(), String> {
         assert!(self.config.api.is_some());
         let config_server = self.config.api.as_ref().unwrap();
         assert!(!config_server.listen_on.is_empty());
@@ -44,10 +52,7 @@ impl ApiService for StorageApi {
             return Err(err.to_string());
         }
 
-        log::info!(
-            "Anor Storage API service listening on {} ...",
-            listen_on
-        );
+        log::info!("Anor Storage API service listening on {} ...", listen_on);
         // listener.set_nonblocking(true).unwrap();
 
         let pool = ThreadPool::new(2);

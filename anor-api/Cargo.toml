@@ -22,3 +22,4 @@ anor-storage = { path = "../anor-storage"}
 
 [build-dependencies]
 prost-build = "0.12.1"
+
