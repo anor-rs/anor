@@ -5,17 +5,12 @@ use std::{
     time::Instant,
 };
 
-use anor_api::{
-    client::api_client::{SocketClient, StorageApiClient},
-    service::api_service::{ApiService, StorageApi},
-};
-use anor_http::client::http_client;
-use anor_http::service::http_service;
-use anor_storage::storage::Storage;
-
-use anor_utils::config::{self, Config};
-
 use tokio::signal::unix::{signal, SignalKind};
+
+use anor_api::{ApiService, Client, SocketClient};
+use anor_http::{client::http_client, service::http_service};
+use anor_storage::Storage;
+use anor_utils::config::{self, Config};
 
 #[tokio::main]
 async fn main() {
@@ -53,35 +48,10 @@ async fn main() {
     // starting API service
     let api_service = start_api_service(config.clone(), storage, server_shutdown.clone());
 
-    // api client tests
-    let mut api_client1 = StorageApiClient::with_config(config.clone());
-    api_client1.connect().expect("client connection error");
-
-    let keys = api_client1.keys();
-    log::debug!("{:?}", keys);
-    _ = api_client1.disconnect();
-
-    /*
-    let msg1 = String::from("Hi there1!");
-    client1.set_item(msg1).expect("set item error");
-    thread::sleep(Duration::from_millis(20));
-    let msg2 = String::from("Hi there2!");
-    client1.set_item(msg2).expect("set item error");
-
-    let mut client2 = StorageApiClient::with_config(config.clone());
-    client2.connect().expect("client connection error");
-
-    let msg1 = String::from("Hi there1!");
-    client2.set_item(msg1).expect("set item error");
-    thread::sleep(Duration::from_millis(20));
-    let msg2 = String::from("Hi there2!");
-    client2.set_item(msg2).expect("set item error");
-    */
-
     api_service.join().unwrap();
-    log::info!("Anor Storage API service is shutdown successfully.");
+    log::info!("Anor Storage API service closed.");
 
-    log::info!("Anor Server is shutdown successfully.");
+    log::info!("Anor Server shutdown successfully.");
 }
 
 fn graceful_shutdown(server_shutdown: Arc<AtomicBool>, config: Arc<Config>) {
@@ -90,7 +60,7 @@ fn graceful_shutdown(server_shutdown: Arc<AtomicBool>, config: Arc<Config>) {
 
     // a temporary solution to unblock socket listener
     // make an empty connection to unblock listener and shutdown the api server
-    let mut api_client_terminate = StorageApiClient::with_config(config);
+    let mut api_client_terminate = Client::with_config(config);
     api_client_terminate
         .connect()
         .expect("client connection error");
@@ -112,8 +82,8 @@ fn start_api_service(
 
     // start the storage api service in a separate thread
     let api_service_handler = thread::spawn(move || {
-        let service = StorageApi::with_config(storage, api_service_config);
-        if let Err(err) = service.start(server_shutdown, api_service_ready_sender) {
+        let api_service = anor_api::Service::with_config(storage, api_service_config);
+        if let Err(err) = api_service.start(server_shutdown, api_service_ready_sender) {
             log::error!("{}", err);
             panic!("{}", err);
         }

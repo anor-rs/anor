@@ -10,6 +10,7 @@ repository = "https://github.com/anor-rs/anor"
 license = "MIT"
 keywords = ["data", "store", "cache", "server", "api", "network"]
 categories = ["data-structures", "caching", "database", "filesystem"]
+default-run = "server"
 
 [dependencies]
 log = "0.4"

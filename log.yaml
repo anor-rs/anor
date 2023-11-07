@@ -10,7 +10,7 @@ root:
 
 loggers:
     anor_common::utils::config:
-        level: debug
+        level: info
 
     anor::storage:
         level: debug

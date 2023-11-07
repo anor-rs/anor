@@ -1,13 +1,12 @@
+use log;
 use std::io::prelude::*;
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 
-use log;
-
-use anor_storage::storage::{storage_item::StorageItem, Storage};
-use anor_utils::{config::Config, threadpool::ThreadPool};
+use anor_storage::{Storage, StorageItem};
+use anor_utils::{Config, ThreadPool};
 
 pub trait ApiService {
     fn with_config(storage: Storage, config: Arc<Config>) -> Self;
@@ -23,16 +22,16 @@ pub trait ApiService {
     fn remove_item(&self, key: &str) -> bool;
 }
 
-pub struct StorageApi {
+pub struct Service {
     storage: Storage,
     config: Arc<Config>,
 }
 
-pub type AnorApiMutex<'a> = Arc<Mutex<StorageApi>>;
+pub type ApiMutex<'a> = Arc<Mutex<Service>>;
 
-impl ApiService for StorageApi {
+impl ApiService for Service {
     fn with_config(storage: Storage, config: Arc<Config>) -> Self {
-        StorageApi { storage, config }
+        Service { storage, config }
     }
 
     fn start(
