@@ -5,6 +5,8 @@
 
 The open-source data access and storage platform
 
+<img src = "docs/img/anor-wb.png" width = "25%"/>
+
 ## Components
 
 * [In-Memory Data Storage](/anor-storage)

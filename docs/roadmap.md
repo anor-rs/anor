@@ -20,7 +20,12 @@
     - support for JWT
     - support for Fine-Grained Access Control
 
-6. Scaling
+6. Message Queue
+    - publish
+    - subscribe
+    - support for delivery and destination options (persisted, non-persisted, at-least-once, at-most-once, exactly-once)
+
+7. Scaling
     - consistent hashing
     - cluster health check / heartbeats
     - support for easy scaling
@@ -34,20 +39,20 @@
         - server node will analyze the received config_id and may respond with updated configuration settings
       - clients and nodes use weighted graphs to optimize node/peer selection and other network operations
 
-7. Caching
+8. Caching
     - client-side and server-side caching support
     - cache evictions policies: LRU/LFU
 
-8. File Storage Spaces
+9. File Storage Spaces
     - support for folders
     - support for path
 
-9. FFI Bindings
+10. FFI Bindings
     - Go
     - Ruby
     - Python
 
-10. Remote Collections
+11. Remote Collections
     - HashSet
     - HashMap
     - Vec

@@ -1,65 +1,65 @@
 use std::sync::atomic::Ordering;
-use std::thread;
+use std::thread::{self, JoinHandle};
 use std::{
     sync::{atomic::AtomicBool, mpsc::channel, Arc},
     time::Instant,
 };
 
-use anor_http::client::http_client;
-use anor_http::service::http_service;
-use anor_storage::storage::Storage;
 use anor_api::{
     client::api_client::{SocketClient, StorageApiClient},
     service::api_service::{ApiService, StorageApi},
 };
+use anor_http::client::http_client;
+use anor_http::service::http_service;
+use anor_storage::storage::Storage;
 
-use anor_utils::config;
+use anor_utils::config::{self, Config};
 
-fn main() {
-    start_api_server();
-}
+use tokio::signal::unix::{signal, SignalKind};
 
-fn start_api_server() {
-    let launch_start = Instant::now();
-
+#[tokio::main]
+async fn main() {
     log4rs::init_file("log.yaml", Default::default()).unwrap();
-
     log::info!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
 
+    // load the configuration
     let config = config::load();
 
     // open the data storage
     let storage = Storage::open_with_config(config.clone());
 
-    // prapare service parameters
-    let api_service_config = config.clone();
-    let api_service_shutdown = Arc::new(AtomicBool::new(false));
-    let api_service_shutdown_clone = api_service_shutdown.clone();
-    let (api_service_ready_sender, api_service_ready_receiver) = channel();
-
-    // start the storage api service in a separate thread
-    let api_service_handler = thread::spawn(move || {
-        let service = StorageApi::with_config(storage, api_service_config);
-        if let Err(err) = service.start(api_service_shutdown_clone, api_service_ready_sender) {
-            log::error!("{}", err);
-            panic!("{}", err);
-        }
+    // hook for graceful shutdown
+    let server_shutdown = Arc::new(AtomicBool::new(false));
+    let config_cloned = config.clone();
+    let server_shutdown_cloned = server_shutdown.clone();
+    tokio::spawn(async move {
+        let mut sigint = signal(SignalKind::interrupt()).unwrap();
+        let mut sigterm = signal(SignalKind::terminate()).unwrap();
+        tokio::select! {
+            _ = sigint.recv() => {
+                if log::log_enabled!(log::Level::Debug) {
+                    log::debug!("Recieved SIGINT");
+                }
+            }
+            _ = sigterm.recv() => {
+                if log::log_enabled!(log::Level::Debug) {
+                    log::debug!("Recieved SIGTERM");
+                }
+            },
+        };
+        graceful_shutdown(server_shutdown_cloned, config_cloned);
     });
 
-    // wait for the readiness of api service
-    if let Err(err) = api_service_ready_receiver.recv() {
-        log::error!("{}", err);
-        panic!("{}", err);
-    }
+    // starting API service
+    let api_service = start_api_service(config.clone(), storage, server_shutdown.clone());
 
-    let launch_elapsed = Instant::elapsed(&launch_start);
-    log::info!("Anor Storage API service started in {:?}", launch_elapsed);
-
+    // api client tests
     let mut api_client1 = StorageApiClient::with_config(config.clone());
     api_client1.connect().expect("client connection error");
 
     let keys = api_client1.keys();
     log::debug!("{:?}", keys);
+    _ = api_client1.disconnect();
 
     /*
     let msg1 = String::from("Hi there1!");
@@ -78,22 +78,60 @@ fn start_api_server() {
     client2.set_item(msg2).expect("set item error");
     */
 
-    // shutdown the api server
-    api_service_shutdown.store(true, Ordering::SeqCst);
+    api_service.join().unwrap();
+    log::info!("Anor Storage API service is shutdown successfully.");
 
+    log::info!("Anor Server is shutdown successfully.");
+}
+
+fn graceful_shutdown(server_shutdown: Arc<AtomicBool>, config: Arc<Config>) {
+    log::info!("Initializing the graceful shutdown process...");
+    server_shutdown.store(true, Ordering::SeqCst);
+
+    // a temporary solution to unblock socket listener
     // make an empty connection to unblock listener and shutdown the api server
-    let mut api_client_terminate = StorageApiClient::with_config(config.clone());
+    let mut api_client_terminate = StorageApiClient::with_config(config);
     api_client_terminate
         .connect()
         .expect("client connection error");
+    _ = api_client_terminate.disconnect();
+}
 
-    api_service_handler.join().unwrap();
+fn start_api_service(
+    config: Arc<Config>,
+    storage: Storage,
+    server_shutdown: Arc<AtomicBool>,
+) -> JoinHandle<()> {
+    log::info!("Starting Anor Storage API service...");
 
-    log::info!("Anor Storage API service is shutdown successfully.");
+    let launch_start = Instant::now();
+
+    // prapare service parameters
+    let api_service_config = config.clone();
+    let (api_service_ready_sender, api_service_ready_receiver) = channel();
+
+    // start the storage api service in a separate thread
+    let api_service_handler = thread::spawn(move || {
+        let service = StorageApi::with_config(storage, api_service_config);
+        if let Err(err) = service.start(server_shutdown, api_service_ready_sender) {
+            log::error!("{}", err);
+            panic!("{}", err);
+        }
+    });
+
+    // wait for the readiness of api service
+    if let Err(err) = api_service_ready_receiver.recv() {
+        log::error!("{}", err);
+        panic!("{}", err);
+    }
+
+    let launch_elapsed = Instant::elapsed(&launch_start);
+    log::info!("Anor Storage API service started in {:?}", launch_elapsed);
+
+    api_service_handler
 }
 
 fn _start_http_server() {
-
     let config = config::load();
 
     // open the data storage
