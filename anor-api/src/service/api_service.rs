@@ -37,7 +37,7 @@ impl ApiService for StorageApi {
 
     fn start(
         &self,
-        shutdown: Arc<AtomicBool>,
+        server_shutdown: Arc<AtomicBool>,
         signal_ready_sender: Sender<()>,
     ) -> Result<(), String> {
         assert!(self.config.api.is_some());
@@ -57,10 +57,10 @@ impl ApiService for StorageApi {
 
         let pool = ThreadPool::new(2);
 
-        while !shutdown.load(Ordering::SeqCst) {
+        while !server_shutdown.load(Ordering::SeqCst) {
             match listener.accept() {
                 Ok((stream, addr)) => {
-                    let shutdown_clone = shutdown.clone();
+                    let shutdown_clone = server_shutdown.clone();
                     pool.execute(move || {
                         handle_connection(stream, addr, shutdown_clone);
                     });

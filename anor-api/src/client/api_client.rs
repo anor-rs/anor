@@ -71,19 +71,19 @@ impl SocketClient for StorageApiClient {
     }
 */
 
-    fn insert(&self, storage_item: StorageItem) {
+    fn insert(&self, _storage_item: StorageItem) {
         todo!()
     }
 
-    fn update(&mut self, key: &str, storage_item: StorageItem) -> std::io::Result<()> {
+    fn update(&mut self, _key: &str, _storage_item: StorageItem) -> std::io::Result<()> {
         todo!()
     }
 
-    fn get(&mut self, key: &str) -> std::io::Result<StorageItem> {
+    fn get(&mut self, _key: &str) -> std::io::Result<StorageItem> {
         todo!()
     }
 
-    fn remove(&self, key: &str) -> bool {
+    fn remove(&self, _key: &str) -> bool {
         todo!()
     }
 
