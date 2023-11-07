@@ -1,4 +1,4 @@
-use super::{storage_codec::*, storage_location::*, storage_packet::*};
+use super::{storage_codec::*, storage_persistence::*, storage_packet::*};
 use std::collections::HashMap;
 use uuid::Uuid;
 
@@ -63,7 +63,7 @@ pub struct StorageItem {
 
     /// `expires_on` - timestamp, defines expiry datetime
     pub expires_on: Option<u64>,
-    pub storage_locations: Vec<StorageLocation>,
+    pub persistence: StoragePersistence,
 
     /// defines the number of required replications in the cluster
     pub redundancy: u8,
@@ -77,7 +77,7 @@ impl StorageItem {
             version: 0,
             description: None,
             item_type: ItemType::Custom,
-            storage_locations: vec![StorageLocation::Memory],
+            persistence: StoragePersistence::Memory,
             data,
             tags: None,
             metafields: None,
@@ -97,7 +97,7 @@ impl StorageItem {
             version: 0,
             description: None,
             item_type: storage_type,
-            storage_locations: vec![StorageLocation::Memory],
+            persistence: StoragePersistence::Memory,
             data,
             tags: None,
             metafields: None,

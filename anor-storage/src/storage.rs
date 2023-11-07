@@ -12,7 +12,7 @@ use std::{
 pub mod storage_codec;
 pub mod storage_const;
 pub mod storage_item;
-pub mod storage_location;
+pub mod storage_persistence;
 pub mod storage_packet;
 
 use storage_codec::*;

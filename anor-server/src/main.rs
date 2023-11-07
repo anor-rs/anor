@@ -13,23 +13,41 @@ use anor_api::{
     service::api_service::{ApiService, StorageApi},
 };
 
-use anor_utils::config;
+use anor_utils::config::{self, Config};
 
-fn main() {
-    start_api_server();
-}
+use tokio::signal::unix::{signal, SignalKind};
 
-fn start_api_server() {
-    let launch_start = Instant::now();
+#[tokio::main]
+async fn main() {
 
     log4rs::init_file("log.yaml", Default::default()).unwrap();
-
     log::info!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
 
+    // support for graceful shutdown
+    let mut sigint = signal(SignalKind::interrupt()).unwrap();
+    let mut sigterm = signal(SignalKind::terminate()).unwrap();
+    tokio::select! {
+        // catch SIGINT,  Ctrl-C
+        _ = sigint.recv() => log::info!("Graceful shutdown: catched SIGINT"),
+
+        // catch SIGTERM
+        _ = sigterm.recv() => log::info!("Graceful shutdown: catched SIGTERM"),
+    };
+
+    // load the configuration
     let config = config::load();
 
     // open the data storage
     let storage = Storage::open_with_config(config.clone());
+
+    start_api_server(config.clone(), storage);
+
+    log::info!("Anor Server is shutdown successfully.");
+
+}
+
+fn start_api_server(config: Arc<Config>, storage: Storage) {
+    let launch_start = Instant::now();
 
     // prapare service parameters
     let api_service_config = config.clone();
