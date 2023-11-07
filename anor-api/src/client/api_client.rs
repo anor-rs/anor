@@ -16,14 +16,14 @@ pub trait SocketClient {
     fn clear(&self);
     fn flush(&self);
 }
-pub struct StorageApiClient {
+pub struct Client {
     stream: Option<TcpStream>,
     config: Arc<Config>,
 }
 
-impl SocketClient for StorageApiClient {
+impl SocketClient for Client {
     fn with_config(config: Arc<Config>) -> Self {
-        StorageApiClient {
+        Client {
             stream: None,
             config,
         }

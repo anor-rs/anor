@@ -6,3 +6,6 @@
 
 pub mod service;
 pub mod client;
+
+pub use service::api_service::*;
+pub use client::api_client::*;

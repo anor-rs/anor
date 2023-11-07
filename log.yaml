@@ -9,8 +9,11 @@ root:
         - stdout
 
 loggers:
+    hyper:
+        level: info
+
     anor_common::utils::config:
-        level: debug
+        level: info
 
     anor::storage:
         level: debug

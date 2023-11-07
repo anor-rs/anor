@@ -8,3 +8,6 @@ pub mod cargo_profile;
 pub mod config;
 pub mod envsubst;
 pub mod threadpool;
+
+pub use config::Config;
+pub use threadpool::ThreadPool;

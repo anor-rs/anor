@@ -1,16 +1,15 @@
+use log;
 use std::io::prelude::*;
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 
-use log;
-
-use anor_storage::storage::{storage_item::StorageItem, Storage};
-use anor_utils::{config::Config, threadpool::ThreadPool};
+use anor_storage::{Storage, StorageItem};
+use anor_utils::{Config, ThreadPool};
 
 pub trait ApiService {
-    fn with_config(storage: Storage, config: Arc<Config>) -> Self;
+    fn with_config(storage: Arc<Storage>, config: Arc<Config>) -> Self;
     fn start(
         &self,
         server_shutdown: Arc<AtomicBool>,
@@ -23,16 +22,16 @@ pub trait ApiService {
     fn remove_item(&self, key: &str) -> bool;
 }
 
-pub struct StorageApi {
-    storage: Storage,
+pub struct Service {
+    storage: Arc<Storage>,
     config: Arc<Config>,
 }
 
-pub type AnorApiMutex<'a> = Arc<Mutex<StorageApi>>;
+pub type ApiMutex<'a> = Arc<Mutex<Service>>;
 
-impl ApiService for StorageApi {
-    fn with_config(storage: Storage, config: Arc<Config>) -> Self {
-        StorageApi { storage, config }
+impl ApiService for Service {
+    fn with_config(storage: Arc<Storage>, config: Arc<Config>) -> Self {
+        Service { storage, config }
     }
 
     fn start(
@@ -52,7 +51,7 @@ impl ApiService for StorageApi {
             return Err(err.to_string());
         }
 
-        log::info!("Anor Storage API service listening on {} ...", listen_on);
+        log::info!("API service listening on {} ...", listen_on);
         // listener.set_nonblocking(true).unwrap();
 
         let pool = ThreadPool::new(2);
