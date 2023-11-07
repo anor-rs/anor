@@ -39,7 +39,11 @@ pub fn get_file_info(url: &str) {
     });
 }
 
-async fn request_url(
+pub fn parse_url_to_uri(url: &str) -> http::Uri {
+    url.parse::<hyper::Uri>().unwrap()
+}
+
+pub async fn request_url(
     method: &str,
     url: hyper::Uri,
     range: Option<Range<u64>>,

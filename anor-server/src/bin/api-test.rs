@@ -1,15 +1,15 @@
-use anor_api::SocketClient;
+use anor_api::{client::api_client, SocketClient};
 use anor_utils::config;
 
 fn main() {
-    // load the configuration
     log4rs::init_file("log.yaml", Default::default()).unwrap();
-    log::info!("client test");
+    log::info!("api client/server test");
 
+    // load the configuration
     let config = config::load();
 
     // api client tests
-    let mut api_client1 = anor_api::Client::with_config(config.clone());
+    let mut api_client1 = api_client::Client::with_config(config.clone());
     api_client1.connect().expect("client connection error");
 
     let keys = api_client1.keys();

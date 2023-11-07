@@ -24,33 +24,38 @@ use anor_utils::config::Config;
 use http_common::http_range::{self, HttpRange};
 
 // A simple type alias so as to DRY.
-type HttpServiceResult<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
+type ServiceResult<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
-pub struct HttpService {
-    _storage: Storage,
+pub struct Service {
+    storage: Arc<Storage>,
     config: Arc<Config>,
 }
 
-impl HttpService {
-    pub fn with_config(_storage: Storage, config: Arc<Config>) -> Self {
+impl Service {
+    pub fn with_config(storage: Arc<Storage>, config: Arc<Config>) -> Self {
         assert!(config.http.is_some());
         assert!(!config.http.as_ref().unwrap().listen_on.is_empty());
-        HttpService { _storage, config }
+        Service { storage, config }
     }
 
     pub fn start(
         &self,
         http_service_ready_sender: Sender<()>,
-        http_service_shutdown: Arc<AtomicBool>,
+        server_shutdown: Arc<AtomicBool>,
     ) -> JoinHandle<()> {
         let listen_on = self.config.http.as_ref().unwrap().listen_on[0];
+        let storage = self.storage.clone();
         log::info!("Starting HTTP service...");
-
         std::thread::spawn(move || {
             let async_runtime = Runtime::new().unwrap();
             async_runtime.block_on(async {
-                if let Err(err) =
-                    start(listen_on, http_service_ready_sender, http_service_shutdown).await
+                if let Err(err) = start(
+                    storage,
+                    listen_on,
+                    http_service_ready_sender,
+                    server_shutdown,
+                )
+                .await
                 {
                     log::error!("HTTP service failed: {:?}", err);
                 }
@@ -60,6 +65,7 @@ impl HttpService {
 }
 
 async fn start(
+    _storage: Arc<Storage>,
     listen_on: SocketAddr,
     http_service_ready_sender: Sender<()>,
     http_service_shutdown: Arc<AtomicBool>,
@@ -73,9 +79,10 @@ async fn start(
 
     log::info!("HTTP service running on http://{}", listen_on);
 
+    let mut tasks: Vec<tokio::task::JoinHandle<()>> = vec![];
     while !http_service_shutdown.load(Ordering::SeqCst) {
         let (stream, _) = listener.accept().await?;
-        tokio::task::spawn(async move {
+        let task = tokio::task::spawn(async move {
             let io = TokioIo::new(stream);
             if let Err(err) = http1::Builder::new()
                 .serve_connection(io, service_fn(file_service))
@@ -84,7 +91,22 @@ async fn start(
                 log::error!("Failed to serve connection: {:?}", err);
             }
         });
+
+        // clean-up, remove finished tasks
+        let removed: Vec<_> = tasks.as_slice().iter().enumerate().filter(|v| v.1.is_finished()).map(|v| v.0).collect();
+        for index in removed {
+            tasks.remove(index);
+        }
+
+        tasks.push(task);
     }
+
+    for task in tasks {
+        if !task.is_finished() {
+            _= task.await;
+        }
+    }
+
     Ok(())
 }
 
@@ -158,7 +180,7 @@ async fn file_info(req: &Request<hyper::body::Incoming>) -> Result<Response<Full
     }
 }
 
-async fn get_file_len(filename: &Path) -> HttpServiceResult<u64> {
+async fn get_file_len(filename: &Path) -> ServiceResult<u64> {
     let file = tokio::fs::File::open(filename).await?;
     let metadata = file.metadata().await?;
     if metadata.is_file() {

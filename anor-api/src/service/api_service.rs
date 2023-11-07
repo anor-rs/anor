@@ -9,7 +9,7 @@ use anor_storage::{Storage, StorageItem};
 use anor_utils::{Config, ThreadPool};
 
 pub trait ApiService {
-    fn with_config(storage: Storage, config: Arc<Config>) -> Self;
+    fn with_config(storage: Arc<Storage>, config: Arc<Config>) -> Self;
     fn start(
         &self,
         server_shutdown: Arc<AtomicBool>,
@@ -23,14 +23,14 @@ pub trait ApiService {
 }
 
 pub struct Service {
-    storage: Storage,
+    storage: Arc<Storage>,
     config: Arc<Config>,
 }
 
 pub type ApiMutex<'a> = Arc<Mutex<Service>>;
 
 impl ApiService for Service {
-    fn with_config(storage: Storage, config: Arc<Config>) -> Self {
+    fn with_config(storage: Arc<Storage>, config: Arc<Config>) -> Self {
         Service { storage, config }
     }
 
@@ -51,7 +51,7 @@ impl ApiService for Service {
             return Err(err.to_string());
         }
 
-        log::info!("Anor Storage API service listening on {} ...", listen_on);
+        log::info!("API service listening on {} ...", listen_on);
         // listener.set_nonblocking(true).unwrap();
 
         let pool = ThreadPool::new(2);
