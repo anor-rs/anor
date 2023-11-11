@@ -10,8 +10,6 @@ use tokio::io::AsyncSeekExt;
 use tokio::net::TcpListener;
 use tokio::runtime::Runtime;
 
-use log;
-
 use bytes::Bytes;
 use http_body_util::Full;
 use hyper::server::conn::http1;
@@ -45,7 +43,7 @@ impl Service {
     ) -> JoinHandle<()> {
         let listen_on = self.config.http.as_ref().unwrap().listen_on[0];
         let storage = self.storage.clone();
-        log::info!("Starting HTTP service...");
+        tracing::info!("Starting HTTP service...");
         std::thread::spawn(move || {
             let async_runtime = Runtime::new().unwrap();
             async_runtime.block_on(async {
@@ -57,7 +55,7 @@ impl Service {
                 )
                 .await
                 {
-                    log::error!("HTTP service failed: {:?}", err);
+                    tracing::error!("HTTP service failed: {:?}", err);
                 }
             });
         })
@@ -77,7 +75,7 @@ async fn start(
         return Err(err.to_string().into());
     }
 
-    log::info!("HTTP service running on http://{}", listen_on);
+    tracing::info!("HTTP service running on http://{}", listen_on);
 
     let mut tasks: Vec<tokio::task::JoinHandle<()>> = vec![];
     while !http_service_shutdown.load(Ordering::SeqCst) {
@@ -88,12 +86,18 @@ async fn start(
                 .serve_connection(io, service_fn(file_service))
                 .await
             {
-                log::error!("Failed to serve connection: {:?}", err);
+                tracing::error!("Failed to serve connection: {:?}", err);
             }
         });
 
         // clean-up, remove finished tasks
-        let removed: Vec<_> = tasks.as_slice().iter().enumerate().filter(|v| v.1.is_finished()).map(|v| v.0).collect();
+        let removed: Vec<_> = tasks
+            .as_slice()
+            .iter()
+            .enumerate()
+            .filter(|v| v.1.is_finished())
+            .map(|v| v.0)
+            .collect();
         for index in removed {
             tasks.remove(index);
         }
@@ -103,7 +107,7 @@ async fn start(
 
     for task in tasks {
         if !task.is_finished() {
-            _= task.await;
+            _ = task.await;
         }
     }
 
@@ -111,8 +115,8 @@ async fn start(
 }
 
 async fn file_service(req: Request<hyper::body::Incoming>) -> Result<Response<Full<Bytes>>> {
-    if log::log_enabled!(log::Level::Trace) {
-        log::trace!("recevied request:{:#?}", req);
+    if tracing::enabled!(tracing::Level::TRACE) {
+        tracing::trace!("recevied request:{:#?}", req);
     }
 
     match *req.method() {
@@ -147,12 +151,12 @@ fn blank_response(status_code: StatusCode) -> Response<Full<Bytes>> {
 async fn file_info(req: &Request<hyper::body::Incoming>) -> Result<Response<Full<Bytes>>> {
     let path = req.uri().path().replace('/', "");
     let file_path = Path::new(&path);
-    if log::log_enabled!(log::Level::Debug) {
-        log::debug!("file path:{:?}", file_path);
+    if tracing::enabled!(tracing::Level::DEBUG) {
+        tracing::debug!("file path:{:?}", file_path);
     }
 
     if file_path.file_name().is_none() {
-        log::error!("filename is empty");
+        tracing::error!("filename is empty");
         return Ok(send_error_403());
     }
 
@@ -164,17 +168,17 @@ async fn file_info(req: &Request<hyper::body::Incoming>) -> Result<Response<Full
                 .header(hyper::header::CONTENT_LENGTH, file_len)
                 .body(Full::new(Bytes::new()))
             {
-                if log::log_enabled!(log::Level::Trace) {
-                    log::trace!("response:{:#?}", response);
+                if tracing::enabled!(tracing::Level::TRACE) {
+                    tracing::trace!("response:{:#?}", response);
                 }
                 Ok(response)
             } else {
-                log::error!("unable to build response");
+                tracing::error!("unable to build response");
                 Ok(send_error_500())
             }
         }
         Err(_err) => {
-            log::error!("file not found: {:?}", file_path);
+            tracing::error!("file not found: {:?}", file_path);
             Ok(send_error_404())
         }
     }
@@ -185,8 +189,8 @@ async fn get_file_len(filename: &Path) -> ServiceResult<u64> {
     let metadata = file.metadata().await?;
     if metadata.is_file() {
         let file_len = metadata.len();
-        if log::log_enabled!(log::Level::Trace) {
-            log::trace!(
+        if tracing::enabled!(tracing::Level::TRACE) {
+            tracing::trace!(
                 "The length of the file {:?} is {} bytes",
                 filename,
                 file_len
@@ -195,7 +199,7 @@ async fn get_file_len(filename: &Path) -> ServiceResult<u64> {
         return Ok(file_len);
     }
     let err_msg = format!("Not a file: {:?}", filename);
-    log::error!("{err_msg}");
+    tracing::error!("{err_msg}");
     Err(err_msg.into())
 }
 
@@ -204,12 +208,12 @@ async fn file_send(req: &Request<hyper::body::Incoming>) -> Result<Response<Full
 
     let path = req.uri().path().replace('/', "");
     let file_path = Path::new(&path);
-    if log::log_enabled!(log::Level::Debug) {
-        log::debug!("file path: {:?}", file_path);
+    if tracing::enabled!(tracing::Level::DEBUG) {
+        tracing::debug!("file path: {:?}", file_path);
     }
 
     if file_path.file_name().is_none() {
-        log::error!("filename is empty");
+        tracing::error!("filename is empty");
         return Ok(send_error_403());
     }
 
@@ -217,7 +221,7 @@ async fn file_send(req: &Request<hyper::body::Incoming>) -> Result<Response<Full
     if let Ok(file_len) = get_file_len(file_path).await {
         content_length = file_len;
     } else {
-        log::error!("file not found: {:?}", file_path);
+        tracing::error!("file not found: {:?}", file_path);
         return Ok(send_error_404());
     }
 
@@ -251,7 +255,7 @@ async fn send_file_full(filename: &Path, content_type: &str) -> Result<Response<
         {
             return Ok(response);
         } else {
-            log::error!("unable to build response");
+            tracing::error!("unable to build response");
             return Ok(send_error_500());
         }
     }
@@ -274,12 +278,12 @@ async fn send_file_range(
             )
             .body(Full::new(Bytes::new()))
         {
-            if log::log_enabled!(log::Level::Debug) {
-                log::debug!("Range Not Satisfiable (416). Requested range is out of existing content, {:?} > {}", http_range, content_length);
+            if tracing::enabled!(tracing::Level::DEBUG) {
+                tracing::debug!("Range Not Satisfiable (416). Requested range is out of existing content, {:?} > {}", http_range, content_length);
             }
             return Ok(response);
         } else {
-            log::error!("unable to build response");
+            tracing::error!("unable to build response");
             return Ok(send_error_500());
         }
     }
@@ -287,21 +291,21 @@ async fn send_file_range(
     let ranges = &http_range.ranges;
     for range in ranges {
         let capacity = (range.end - range.start + 1) as usize;
-        if log::log_enabled!(log::Level::Trace) {
-            log::trace!("preparing the range to send {:?}", range);
-            log::trace!("capacity {}", capacity);
+        if tracing::enabled!(tracing::Level::TRACE) {
+            tracing::trace!("preparing the range to send {:?}", range);
+            tracing::trace!("capacity {}", capacity);
         }
 
         if HttpRange::range_satisfiable(range, content_length) {
             let mut buffer = vec![0; capacity];
             if let Ok(mut file) = tokio::fs::File::open(&filename).await {
                 if let Ok(_seek) = file.seek(SeekFrom::Start(range.start)).await {
-                    if log::log_enabled!(log::Level::Trace) {
-                        log::trace!("seek result {}", _seek);
+                    if tracing::enabled!(tracing::Level::TRACE) {
+                        tracing::trace!("seek result {}", _seek);
                     }
                     if let Ok(read_count) = file.read_exact(&mut buffer).await {
-                        if log::log_enabled!(log::Level::Trace) {
-                            log::trace!("read_count {}", read_count);
+                        if tracing::enabled!(tracing::Level::TRACE) {
+                            tracing::trace!("read_count {}", read_count);
                         }
                         let body: Bytes = buffer.into();
                         if let Ok(response) = Response::builder()
@@ -322,17 +326,17 @@ async fn send_file_range(
                         {
                             return Ok(response);
                         } else {
-                            log::error!("unable to build response");
+                            tracing::error!("unable to build response");
                             return Ok(send_error_500());
                         }
                     } else {
-                        log::error!("could not read bytes from file");
+                        tracing::error!("could not read bytes from file");
                     }
                 } else {
-                    log::error!("could not seek file position: {}", range.start);
+                    tracing::error!("could not seek file position: {}", range.start);
                 }
             } else {
-                log::error!("could not open file: {:?}", filename);
+                tracing::error!("could not open file: {:?}", filename);
             }
         }
     }

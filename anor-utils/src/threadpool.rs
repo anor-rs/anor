@@ -23,8 +23,8 @@ impl Drop for ThreadPool {
         drop(self.sender.take());
 
         for worker in &mut self.workers {
-            if log::log_enabled!(log::Level::Trace) {
-                log::trace!("Shutting down worker {}", worker.id);
+            if tracing::enabled!(tracing::Level::TRACE) {
+                tracing::trace!("Shutting down worker {}", worker.id);
             }
             if let Some(thread) = worker.thread.take() {
                 thread.join().unwrap();
@@ -82,15 +82,15 @@ impl Worker {
 
             match message {
                 Ok(job) => {
-                    if log::log_enabled!(log::Level::Trace) {
-                        log::trace!("Worker {id} got a job; executing.");
+                    if tracing::enabled!(tracing::Level::TRACE) {
+                        tracing::trace!("Worker {id} got a job; executing.");
                     }
 
                     job();
                 }
                 Err(_) => {
-                    if log::log_enabled!(log::Level::Trace) {
-                        log::trace!("Worker {id} disconnected; shutting down.");
+                    if tracing::enabled!(tracing::Level::TRACE) {
+                        tracing::trace!("Worker {id} disconnected; shutting down.");
                     }
                     break;
                 }

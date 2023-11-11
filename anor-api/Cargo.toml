@@ -12,8 +12,7 @@ keywords = ["api", "server", "network", "data", "cache"]
 categories = ["data-structures", "caching", "database", "network-programming"]
 
 [dependencies]
-log = "0.4"
-log4rs = "1.2"
+tracing = "0.1"
 prost = "0.12"
 bytes = "1.5.0"
 

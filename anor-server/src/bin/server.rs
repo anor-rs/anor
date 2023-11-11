@@ -7,6 +7,8 @@ use std::{
 
 use tokio::signal::unix::{signal, SignalKind};
 
+use tracing_subscriber::{prelude::*, util::SubscriberInitExt};
+
 use anor_api::{client::api_client, ApiService, SocketClient};
 use anor_http::{http_client, http_service};
 use anor_storage::Storage;
@@ -14,8 +16,18 @@ use anor_utils::config::{self, Config};
 
 #[tokio::main]
 async fn main() {
-    log4rs::init_file("log.yaml", Default::default()).unwrap();
-    log::info!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
+    tracing_subscriber::registry()
+        .with(
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+                "info,anor_storage=debug,anor_api=debug,anor_http=debug,anor_server=trace".into()
+            }),
+        )
+        .with(tracing_subscriber::fmt::layer())
+        .init();
+
+    if tracing::enabled!(tracing::Level::INFO) {
+        tracing::info!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
+    }
 
     // load the configuration
     let config = config::load();
@@ -55,13 +67,13 @@ async fn main() {
         let mut sigterm = signal(SignalKind::terminate()).unwrap();
         tokio::select! {
             _ = sigint.recv() => {
-                if log::log_enabled!(log::Level::Debug) {
-                    log::debug!("Recieved SIGINT");
+                if tracing::enabled!(tracing::Level::DEBUG) {
+                    tracing::debug!("Recieved SIGINT");
                 }
             }
             _ = sigterm.recv() => {
-                if log::log_enabled!(log::Level::Debug) {
-                    log::debug!("Recieved SIGTERM");
+                if tracing::enabled!(tracing::Level::DEBUG) {
+                    tracing::debug!("Recieved SIGTERM");
                 }
             },
         };
@@ -70,15 +82,15 @@ async fn main() {
 
     if let Some(service) = api_service {
         service.join().unwrap();
-        log::info!("API service closed.");
+        tracing::info!("API service closed.");
     }
 
     if let Some(service) = http_service {
         service.join().unwrap();
-        log::info!("HTTP service closed.");
+        tracing::info!("HTTP service closed.");
     }
 
-    log::info!("Anor Server shutdown successfully.");
+    tracing::info!("Anor Server shutdown successfully.");
 }
 
 fn start_api_service(
@@ -87,7 +99,7 @@ fn start_api_service(
     server_shutdown: Arc<AtomicBool>,
 ) -> JoinHandle<()> {
     let launch_start = Instant::now();
-    log::info!("Starting API service...");
+    tracing::info!("Starting API service...");
 
     // prapare service parameters
     let (api_service_ready_sender, api_service_ready_receiver) = channel();
@@ -96,19 +108,19 @@ fn start_api_service(
     let api_service_handler = thread::spawn(move || {
         let api_service = anor_api::Service::with_config(storage, config);
         if let Err(err) = api_service.start(server_shutdown, api_service_ready_sender) {
-            log::error!("{}", err);
+            tracing::error!("{}", err);
             panic!("{}", err);
         }
     });
 
     // wait for the readiness of api service
     if let Err(err) = api_service_ready_receiver.recv() {
-        log::error!("{}", err);
+        tracing::error!("{}", err);
         panic!("{}", err);
     }
 
     let launch_elapsed = Instant::elapsed(&launch_start);
-    log::info!("API service started in {:?}", launch_elapsed);
+    tracing::info!("API service started in {:?}", launch_elapsed);
 
     api_service_handler
 }
@@ -118,7 +130,7 @@ fn start_http_service(
     storage: Arc<Storage>,
     server_shutdown: Arc<AtomicBool>,
 ) -> JoinHandle<()> {
-    log::info!("Starting HTTP service...");
+    tracing::info!("Starting HTTP service...");
     let launch_start = Instant::now();
 
     // prepare http service
@@ -131,18 +143,18 @@ fn start_http_service(
 
     // wait for the readiness of http service
     if let Err(err) = http_service_ready_receiver.recv() {
-        log::error!("{}", err);
+        tracing::error!("{}", err);
         panic!("{}", err);
     }
 
     let launch_elapsed = Instant::elapsed(&launch_start);
-    log::info!("HTTP service started in {:?}", launch_elapsed);
+    tracing::info!("HTTP service started in {:?}", launch_elapsed);
 
     handle_http_service
 }
 
 async fn graceful_shutdown(server_shutdown: Arc<AtomicBool>, config: Arc<Config>) {
-    log::info!("Initializing the graceful shutdown process...");
+    tracing::info!("Initializing the graceful shutdown process...");
     server_shutdown.store(true, Ordering::SeqCst);
 
     // a temporary solution to unblock socket listener
@@ -157,6 +169,6 @@ async fn graceful_shutdown(server_shutdown: Arc<AtomicBool>, config: Arc<Config>
 
     if config.http.is_some() && config.http.as_ref().unwrap().enabled {
         let url = http_client::parse_url_to_uri("http://127.0.0.1:8181/LICENSE");
-        _ = http_client::request_url("HEAD",url, None).await;
+        _ = http_client::request_url("HEAD", url, None).await;
     }
 }

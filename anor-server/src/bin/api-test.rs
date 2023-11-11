@@ -1,9 +1,19 @@
+use tracing_subscriber::{prelude::*, util::SubscriberInitExt};
+
 use anor_api::{client::api_client, SocketClient};
 use anor_utils::config;
 
 fn main() {
-    log4rs::init_file("log.yaml", Default::default()).unwrap();
-    log::info!("api client/server test");
+    tracing_subscriber::registry()
+        .with(
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+                "info,anor_storage=debug,anor_api=debug,anor_http=debug,anor_server=trace".into()
+            }),
+        )
+        .with(tracing_subscriber::fmt::layer())
+        .init();
+
+    tracing::info!("api client/server test");
 
     // load the configuration
     let config = config::load();
@@ -13,7 +23,7 @@ fn main() {
     api_client1.connect().expect("client connection error");
 
     let keys = api_client1.keys();
-    log::debug!("{:?}", keys);
+    tracing::debug!("{:?}", keys);
 
     _ = api_client1.disconnect();
 
