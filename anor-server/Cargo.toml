@@ -13,8 +13,9 @@ categories = ["data-structures", "caching", "database", "filesystem"]
 default-run = "server"
 
 [dependencies]
-log = "0.4"
-log4rs = "1.2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
 tokio = { version = "1", features = ["full"] }
 
 anor-storage = { path = "../anor-storage"}

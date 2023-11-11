@@ -38,7 +38,7 @@ impl SocketClient for Client {
         let stream = TcpStream::connect(remote_address)?;
 
         let local_addr = stream.local_addr().unwrap();
-        log::info!("connected to {} as {}", remote_address, local_addr);
+        tracing::info!("connected to {} as {}", remote_address, local_addr);
 
         stream.set_nodelay(true).expect("set_nodelay call failed");
 

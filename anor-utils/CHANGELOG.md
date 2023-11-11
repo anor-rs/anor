@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## Unreleased
+
+* tracing used for logs
+
 ## 0.1.4 (2023-11-03)
 
 * updated readme

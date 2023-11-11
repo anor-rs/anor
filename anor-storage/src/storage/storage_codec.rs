@@ -16,13 +16,13 @@ pub fn encode_to_binary<T: bincode::Encode>(
             match bincode::encode_to_vec(obj, bincode_config) {
                 Ok(arr) => Some(arr),
                 Err(msg) => {
-                    log::error!("Object to Binary encode error: {}", msg.to_string());
+                    tracing::error!("Object to Binary encode error: {}", msg.to_string());
                     None
                 }
             }
         }
         _ => {
-            log::error!("Codec {:?} not supported yet", codec_type);
+            tracing::error!("Codec {:?} not supported yet", codec_type);
             None
         }
     }
@@ -42,13 +42,13 @@ pub fn decode_from_binary<T: bincode::Decode>(
                     Some(decoded)
                 }
                 Err(msg) => {
-                    log::error!("Binary to Object decode error: {}", msg.to_string());
+                    tracing::error!("Binary to Object decode error: {}", msg.to_string());
                     None
                 }
             }
         }
         _ => {
-            log::error!("Codec {:?} not supported yet", codec_type);
+            tracing::error!("Codec {:?} not supported yet", codec_type);
             None
         }
     }

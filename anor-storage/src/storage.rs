@@ -27,12 +27,12 @@ macro_rules! take_guard {
             Err(_) => {
                 // poisoned, log and terminate
                 let err = format!("{} is poisoned", stringify!($g));
-                log::error!("{}", err);
+                tracing::error!("{}", err);
                 panic!("{}", err);
                 /*
                 let guard = poisoned.into_inner();
-                if log::log_enabled!(log::Level::Warn) {
-                    log::warn!(
+                if tracing::log_enabled!(tracing::Level::Warn) {
+                    tracing::warn!(
                         "{} recovered from poisoning: {:?}",
                         stringify!($g),
                         *guard
@@ -116,7 +116,7 @@ impl Storage {
         let mut storage = Self::init(config.clone());
         if let Err(err) = storage.load() {
             storage.unlock();
-            log::error!("{}", err);
+            tracing::error!("{}", err);
             panic!("{}", err);
         }
         storage
@@ -133,7 +133,7 @@ impl Storage {
 
         // create storage_path if not exists
         if let Err(err) = std::fs::create_dir_all(storage_path) {
-            log::error!("{}", err);
+            tracing::error!("{}", err);
             panic!("{}", err);
         };
 
@@ -148,7 +148,7 @@ impl Storage {
         {
             Ok(file) => file,
             Err(err) => {
-                log::error!("{}", err);
+                tracing::error!("{}", err);
                 panic!("{}", err);
             }
         };
@@ -164,7 +164,7 @@ impl Storage {
                     lock_filepath.to_string_lossy(),
                     err
                 );
-                log::error!("{}", error_message);
+                tracing::error!("{}", error_message);
                 panic!("{}", error_message);
             }
             thread::sleep(lock_try_duration);
@@ -198,14 +198,14 @@ impl Storage {
                             self.insert(storage_item)
                         }
                         Err(err) => {
-                            log::error!("{}", err);
+                            tracing::error!("{}", err);
                             return Err(err);
                         }
                     }
                 }
             }
             Err(err) => {
-                log::error!("{}", err);
+                tracing::error!("{}", err);
             }
         };
         global_lock.unlock();
@@ -220,7 +220,7 @@ impl Storage {
         let persisted_info = match self.load_storage_info() {
             Ok(objects) => Some(objects),
             Err(err) => {
-                log::error!("{}", err);
+                tracing::error!("{}", err);
                 None
             }
         };
@@ -234,14 +234,14 @@ impl Storage {
 
         // persist the storage info
         if let Err(err) = self.persist_storage_info(&info_to_persist) {
-            log::error!("{}", err);
+            tracing::error!("{}", err);
             return Err(err);
         }
 
         // create storage_data_path if not exists
         let storage_data_path = self.get_storage_data_path();
         if let Err(err) = std::fs::create_dir_all(&storage_data_path) {
-            log::error!("{}", err);
+            tracing::error!("{}", err);
             return Err(err.to_string());
         };
 
@@ -267,7 +267,7 @@ impl Storage {
         // remove blob files corresponding to removed items
         for path in to_remove {
             if let Err(err) = std::fs::remove_file(path) {
-                log::error!("Could not remove unused item blob file: {}", err);
+                tracing::error!("Could not remove unused item blob file: {}", err);
             }
         }
 
@@ -289,7 +289,7 @@ impl Storage {
 
                 if needs_persist {
                     if let Err(err) = self.persist_item(&item) {
-                        log::error!("{}", err);
+                        tracing::error!("{}", err);
                         return Err(err);
                     }
                 }
@@ -334,14 +334,14 @@ impl Storage {
     /// Unlocks the storage
     fn unlock(&mut self) {
         if let Err(err) = self.instance_lock.unlock() {
-            log::error!("{}", err);
+            tracing::error!("{}", err);
         }
     }
 
     /// Closes the storage
     fn close(&mut self) {
         if let Err(err) = self.flush() {
-            log::error!("{}", err);
+            tracing::error!("{}", err);
         }
         self.unlock();
     }

@@ -12,9 +12,7 @@ keywords = ["data", "store", "cache"]
 categories = ["data-structures", "caching", "database", "filesystem"]
 
 [dependencies]
-log = "0.4"
-log4rs = "1.2"
-
+tracing = "0.1"
 hyper = { version = "1.0.0-rc.4", features = ["full"] }
 tokio = { version = "1", features = ["full"] }
 tokio-util = "0.7"
@@ -25,6 +23,5 @@ bytes = "1"
 
 http_common = "0.2.2"
 
-anor-utils = { path = "../anor-utils"}
-anor-storage = { path = "../anor-storage"}
-
+anor-utils = { path = "../anor-utils" }
+anor-storage = { path = "../anor-storage" }

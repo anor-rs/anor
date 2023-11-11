@@ -1,4 +1,3 @@
-use log;
 use std::io::prelude::*;
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -51,7 +50,7 @@ impl ApiService for Service {
             return Err(err.to_string());
         }
 
-        log::info!("API service listening on {} ...", listen_on);
+        tracing::info!("API service listening on {} ...", listen_on);
         // listener.set_nonblocking(true).unwrap();
 
         let pool = ThreadPool::new(2);
@@ -72,7 +71,11 @@ impl ApiService for Service {
                     continue;
                 }
                 */
-                Err(e) => log::error!("couldn't get client: {e:?}"),
+                Err(e) => {
+                    if tracing::enabled!(tracing::Level::TRACE) {
+                        tracing::error!("couldn't get client: {e:?}")
+                    }
+                }
             }
         }
 
@@ -100,21 +103,24 @@ impl ApiService for Service {
 }
 
 fn handle_connection(mut stream: TcpStream, addr: SocketAddr, shutdown: Arc<AtomicBool>) {
-    log::debug!("Client connected: {}", addr);
+    if tracing::enabled!(tracing::Level::DEBUG) {
+        tracing::debug!("Client connected: {}", addr);
+    }
+
     let mut buf = [0; 1024];
     let addr = stream.peer_addr().unwrap();
     while !shutdown.load(Ordering::SeqCst) {
         let count = stream.read(&mut buf).unwrap();
-        if log::log_enabled!(log::Level::Trace) {
-            log::trace!("Received bytes count from {} : {}", addr, count);
+        if tracing::enabled!(tracing::Level::TRACE) {
+            tracing::trace!("Received bytes count from {} : {}", addr, count);
         }
 
         let mut vec = buf.to_vec();
         vec.truncate(count);
         let msg = String::from_utf8(vec).unwrap();
 
-        if log::log_enabled!(log::Level::Trace) {
-            log::trace!("Received message from {} : {}", addr, msg);
+        if tracing::enabled!(tracing::Level::TRACE) {
+            tracing::trace!("Received message from {} : {}", addr, msg);
         }
     }
 }

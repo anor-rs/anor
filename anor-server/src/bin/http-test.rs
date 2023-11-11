@@ -1,8 +1,16 @@
 use anor_http::http_client;
+use tracing_subscriber::{prelude::*, util::SubscriberInitExt};
 
 fn main() {
-    log4rs::init_file("log.yaml", Default::default()).unwrap();
-    log::info!("http client/server test");
+    tracing_subscriber::registry()
+        .with(
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+                "info,anor_storage=debug,anor_api=debug,anor_http=debug,anor_server=trace".into()
+            }),
+        )
+        .with(tracing_subscriber::fmt::layer())
+        .init();
+    tracing::info!("http client/server test");
 
     // try to access the service by http client
     http_client::get_file_info("http://127.0.0.1:8181/LICENSE");

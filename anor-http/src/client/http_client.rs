@@ -22,7 +22,7 @@ pub fn get_file_in_range(url: &str, range: Option<Range<u64>>) {
     async_runtime.block_on(async {
         let result = request_url("GET", url, range).await;
         if let Err(err) = result {
-            log::error!("Connection failed: {:?}", err)
+            tracing::error!("Connection failed: {:?}", err)
         }
     });
 }
@@ -34,7 +34,7 @@ pub fn get_file_info(url: &str) {
     async_runtime.block_on(async {
         let result = request_url("HEAD", url, None).await;
         if let Err(err) = result {
-            log::error!("Connection failed: {:?}", err)
+            tracing::error!("Connection failed: {:?}", err)
         }
     });
 }
@@ -57,12 +57,12 @@ pub async fn request_url(
     let (mut sender, conn) = hyper::client::conn::http1::handshake(io).await?;
     tokio::task::spawn(async move {
         if let Err(err) = conn.await {
-            log::error!("Connection failed: {:?}", err);
+            tracing::error!("Connection failed: {:?}", err);
         }
     });
 
-    if log::log_enabled!(log::Level::Trace) {
-        log::trace!(
+    if tracing::enabled!(tracing::Level::TRACE) {
+        tracing::trace!(
             "File client connected to {}://{}:{}",
             url.scheme().unwrap(),
             host,
@@ -89,15 +89,15 @@ pub async fn request_url(
         );
     }
 
-    if log::log_enabled!(log::Level::Trace) {
-        log::trace!("Request:\n{:#?}", req);
+    if tracing::enabled!(tracing::Level::TRACE) {
+        tracing::trace!("Request:\n{:#?}", req);
     }
 
     let mut res = sender.send_request(req).await?;
 
-    if log::log_enabled!(log::Level::Trace) {
-        log::trace!("Response status: {}", res.status());
-        log::trace!("Response headers:\n{:#?}", res.headers());
+    if tracing::enabled!(tracing::Level::TRACE) {
+        tracing::trace!("Response status: {}", res.status());
+        tracing::trace!("Response headers:\n{:#?}", res.headers());
     }
 
     // Stream the body, writing each chunk to stdout as we get it
