@@ -16,11 +16,10 @@ pub fn get_file(url: &str) {
 }
 
 pub fn get_file_in_range(url: &str, range: Option<Range<u64>>) {
-    let url = url.parse::<hyper::Uri>().unwrap();
-
+    let uri = parse_url_to_uri(url);
     let async_runtime = Runtime::new().unwrap();
     async_runtime.block_on(async {
-        let result = request_url("GET", url, range).await;
+        let result = request_url("GET", uri, range).await;
         if let Err(err) = result {
             tracing::error!("Connection failed: {:?}", err)
         }
@@ -28,28 +27,27 @@ pub fn get_file_in_range(url: &str, range: Option<Range<u64>>) {
 }
 
 pub fn get_file_info(url: &str) {
-    let url = url.parse::<hyper::Uri>().unwrap();
-
+    let uri = parse_url_to_uri(url);
     let async_runtime = Runtime::new().unwrap();
     async_runtime.block_on(async {
-        let result = request_url("HEAD", url, None).await;
+        let result = request_url("HEAD", uri, None).await;
         if let Err(err) = result {
             tracing::error!("Connection failed: {:?}", err)
         }
     });
 }
 
-pub fn parse_url_to_uri(url: &str) -> http::Uri {
+pub fn parse_url_to_uri(url: &str) -> hyper::Uri {
     url.parse::<hyper::Uri>().unwrap()
 }
 
 pub async fn request_url(
     method: &str,
-    url: hyper::Uri,
+    uri: hyper::Uri,
     range: Option<Range<u64>>,
 ) -> HttpClientResult<()> {
-    let host = url.host().expect("uri has no host");
-    let port = url.port_u16().unwrap_or(80);
+    let host = uri.host().expect("uri has no host");
+    let port = uri.port_u16().unwrap_or(80);
     let addr = format!("{}:{}", host, port);
     let stream = TcpStream::connect(addr).await?;
     let io = TokioIo::new(stream);
@@ -63,15 +61,15 @@ pub async fn request_url(
 
     tracing::trace!(
         "File client connected to {}://{}:{}",
-        url.scheme().unwrap(),
+        uri.scheme().unwrap(),
         host,
         port
     );
 
-    let authority = url.authority().unwrap().clone();
+    let authority = uri.authority().unwrap().clone();
 
     let mut req = Request::builder()
-        .uri(url)
+        .uri(uri)
         .method(method)
         .header(hyper::header::HOST, authority.as_str())
         .body(Empty::<Bytes>::new())?;
