@@ -115,9 +115,7 @@ async fn start(
 }
 
 async fn file_service(req: Request<hyper::body::Incoming>) -> Result<Response<Full<Bytes>>> {
-    if tracing::enabled!(tracing::Level::TRACE) {
-        tracing::trace!("recevied request:{:#?}", req);
-    }
+    tracing::trace!("recevied request:{:#?}", req);
 
     match *req.method() {
         Method::HEAD => file_info(&req).await,
@@ -151,9 +149,7 @@ fn blank_response(status_code: StatusCode) -> Response<Full<Bytes>> {
 async fn file_info(req: &Request<hyper::body::Incoming>) -> Result<Response<Full<Bytes>>> {
     let path = req.uri().path().replace('/', "");
     let file_path = Path::new(&path);
-    if tracing::enabled!(tracing::Level::DEBUG) {
-        tracing::debug!("file path:{:?}", file_path);
-    }
+    tracing::debug!("file path:{:?}", file_path);
 
     if file_path.file_name().is_none() {
         tracing::error!("filename is empty");
@@ -168,9 +164,7 @@ async fn file_info(req: &Request<hyper::body::Incoming>) -> Result<Response<Full
                 .header(hyper::header::CONTENT_LENGTH, file_len)
                 .body(Full::new(Bytes::new()))
             {
-                if tracing::enabled!(tracing::Level::TRACE) {
-                    tracing::trace!("response:{:#?}", response);
-                }
+                tracing::trace!("response:{:#?}", response);
                 Ok(response)
             } else {
                 tracing::error!("unable to build response");
@@ -189,13 +183,11 @@ async fn get_file_len(filename: &Path) -> ServiceResult<u64> {
     let metadata = file.metadata().await?;
     if metadata.is_file() {
         let file_len = metadata.len();
-        if tracing::enabled!(tracing::Level::TRACE) {
-            tracing::trace!(
-                "The length of the file {:?} is {} bytes",
-                filename,
-                file_len
-            )
-        }
+        tracing::trace!(
+            "The length of the file {:?} is {} bytes",
+            filename,
+            file_len
+        );
         return Ok(file_len);
     }
     let err_msg = format!("Not a file: {:?}", filename);
@@ -208,9 +200,7 @@ async fn file_send(req: &Request<hyper::body::Incoming>) -> Result<Response<Full
 
     let path = req.uri().path().replace('/', "");
     let file_path = Path::new(&path);
-    if tracing::enabled!(tracing::Level::DEBUG) {
-        tracing::debug!("file path: {:?}", file_path);
-    }
+    tracing::debug!("file path: {:?}", file_path);
 
     if file_path.file_name().is_none() {
         tracing::error!("filename is empty");
@@ -278,9 +268,7 @@ async fn send_file_range(
             )
             .body(Full::new(Bytes::new()))
         {
-            if tracing::enabled!(tracing::Level::DEBUG) {
-                tracing::debug!("Range Not Satisfiable (416). Requested range is out of existing content, {:?} > {}", http_range, content_length);
-            }
+            tracing::debug!("Range Not Satisfiable (416). Requested range is out of existing content, {:?} > {}", http_range, content_length);
             return Ok(response);
         } else {
             tracing::error!("unable to build response");
@@ -300,13 +288,9 @@ async fn send_file_range(
             let mut buffer = vec![0; capacity];
             if let Ok(mut file) = tokio::fs::File::open(&filename).await {
                 if let Ok(_seek) = file.seek(SeekFrom::Start(range.start)).await {
-                    if tracing::enabled!(tracing::Level::TRACE) {
-                        tracing::trace!("seek result {}", _seek);
-                    }
+                    tracing::trace!("seek result {}", _seek);
                     if let Ok(read_count) = file.read_exact(&mut buffer).await {
-                        if tracing::enabled!(tracing::Level::TRACE) {
-                            tracing::trace!("read_count {}", read_count);
-                        }
+                        tracing::trace!("read_count {}", read_count);
                         let body: Bytes = buffer.into();
                         if let Ok(response) = Response::builder()
                             .status(StatusCode::PARTIAL_CONTENT)

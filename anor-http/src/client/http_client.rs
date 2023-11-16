@@ -61,14 +61,12 @@ pub async fn request_url(
         }
     });
 
-    if tracing::enabled!(tracing::Level::TRACE) {
-        tracing::trace!(
-            "File client connected to {}://{}:{}",
-            url.scheme().unwrap(),
-            host,
-            port
-        );
-    }
+    tracing::trace!(
+        "File client connected to {}://{}:{}",
+        url.scheme().unwrap(),
+        host,
+        port
+    );
 
     let authority = url.authority().unwrap().clone();
 
@@ -89,9 +87,7 @@ pub async fn request_url(
         );
     }
 
-    if tracing::enabled!(tracing::Level::TRACE) {
-        tracing::trace!("Request:\n{:#?}", req);
-    }
+    tracing::trace!("Request:\n{:#?}", req);
 
     let mut res = sender.send_request(req).await?;
 

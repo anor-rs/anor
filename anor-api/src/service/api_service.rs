@@ -72,9 +72,7 @@ impl ApiService for Service {
                 }
                 */
                 Err(e) => {
-                    if tracing::enabled!(tracing::Level::TRACE) {
-                        tracing::error!("couldn't get client: {e:?}")
-                    }
+                    tracing::error!("couldn't get client: {e:?}")
                 }
             }
         }
@@ -103,24 +101,18 @@ impl ApiService for Service {
 }
 
 fn handle_connection(mut stream: TcpStream, addr: SocketAddr, shutdown: Arc<AtomicBool>) {
-    if tracing::enabled!(tracing::Level::DEBUG) {
-        tracing::debug!("Client connected: {}", addr);
-    }
+    tracing::debug!("Client connected: {}", addr);
 
     let mut buf = [0; 1024];
     let addr = stream.peer_addr().unwrap();
     while !shutdown.load(Ordering::SeqCst) {
         let count = stream.read(&mut buf).unwrap();
-        if tracing::enabled!(tracing::Level::TRACE) {
-            tracing::trace!("Received bytes count from {} : {}", addr, count);
-        }
+        tracing::trace!("Received bytes count from {} : {}", addr, count);
 
         let mut vec = buf.to_vec();
         vec.truncate(count);
         let msg = String::from_utf8(vec).unwrap();
 
-        if tracing::enabled!(tracing::Level::TRACE) {
-            tracing::trace!("Received message from {} : {}", addr, msg);
-        }
+        tracing::trace!("Received message from {} : {}", addr, msg);
     }
 }

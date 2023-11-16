@@ -69,9 +69,7 @@ pub fn load() -> Arc<Config> {
         serde_yaml::from_str(&config_substituted)
             .unwrap_or_else(|_| panic!("Could not parse {} file.", config_filename));
 
-    if tracing::enabled!(tracing::Level::TRACE) {
-        tracing::trace!("loaded config:\n{:#?}", config_map);
-    }
+    tracing::trace!("loaded config:\n{:#?}", config_map);
 
     let mut config = Config {
         storage: None,
@@ -118,9 +116,7 @@ pub fn load() -> Arc<Config> {
         config.remote = Some(remote);
     }
 
-    if tracing::enabled!(tracing::Level::DEBUG) {
-        tracing::debug!("parsed config:\n{:#?}", config);
-    }
+    tracing::debug!("parsed config:\n{:#?}", config);
 
     Arc::new(config)
 }
@@ -140,9 +136,7 @@ fn parse_listen_on(
         vec![default_listen_address]
     };
 
-    if tracing::enabled!(tracing::Level::TRACE) {
-        tracing::trace!("config: listen_addresses: {:?}", listen_addresses);
-    }
+    tracing::trace!("config: listen_addresses: {:?}", listen_addresses);
 
     let node_key = "listen_port";
     let port = if node.contains_key(node_key) {
@@ -151,9 +145,7 @@ fn parse_listen_on(
         default_listen_port
     };
 
-    if tracing::enabled!(tracing::Level::TRACE) {
-        tracing::trace!("config: listen_port: {}", port);
-    }
+    tracing::trace!("config: listen_port: {}", port);
 
     let mut listen_on = Vec::<SocketAddr>::with_capacity(listen_addresses.len());
     for listen_addres in listen_addresses {
@@ -162,9 +154,7 @@ fn parse_listen_on(
         listen_on.push(socket_addres);
     }
 
-    if tracing::enabled!(tracing::Level::TRACE) {
-        tracing::trace!("parsed: listen_on: {:?}", listen_on);
-    }
+    tracing::trace!("parsed: listen_on: {:?}", listen_on);
 
     listen_on
 }
@@ -191,9 +181,7 @@ fn parse_remote(node: &HashMap<String, String>) -> RemoteConfig {
         vec![DEFAULT_REMOTE_NODE]
     };
 
-    if tracing::enabled!(tracing::Level::TRACE) {
-        tracing::trace!("config: remote nodes: {:?}", remote_nodes);
-    }
+    tracing::trace!("config: remote nodes: {:?}", remote_nodes);
 
     let mut nodes = Vec::<SocketAddr>::with_capacity(remote_nodes.len());
     for node in remote_nodes {
@@ -201,9 +189,7 @@ fn parse_remote(node: &HashMap<String, String>) -> RemoteConfig {
         nodes.push(socket_addr);
     }
 
-    if tracing::enabled!(tracing::Level::TRACE) {
-        tracing::trace!("parsed: remote nodes: {:?}", nodes);
-    }
+    tracing::trace!("parsed: remote nodes: {:?}", nodes);
 
     RemoteConfig { nodes }
 }
