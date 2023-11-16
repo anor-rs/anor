@@ -25,9 +25,7 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    if tracing::enabled!(tracing::Level::INFO) {
-        tracing::info!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
-    }
+    tracing::info!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
 
     // load the configuration
     let config = config::load();
@@ -67,14 +65,10 @@ async fn main() {
         let mut sigterm = signal(SignalKind::terminate()).unwrap();
         tokio::select! {
             _ = sigint.recv() => {
-                if tracing::enabled!(tracing::Level::DEBUG) {
-                    tracing::debug!("Recieved SIGINT");
-                }
+                tracing::debug!("Recieved SIGINT");
             }
             _ = sigterm.recv() => {
-                if tracing::enabled!(tracing::Level::DEBUG) {
-                    tracing::debug!("Recieved SIGTERM");
-                }
+                tracing::debug!("Recieved SIGTERM");
             },
         };
         graceful_shutdown(server_shutdown, config_cloned).await;

@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
-* tracing used for logs
+* using `tracing` for logs
 * project moved into anor workspace
 * added http service
 

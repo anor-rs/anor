@@ -31,13 +31,11 @@ macro_rules! take_guard {
                 panic!("{}", err);
                 /*
                 let guard = poisoned.into_inner();
-                if tracing::log_enabled!(tracing::Level::Warn) {
-                    tracing::warn!(
-                        "{} recovered from poisoning: {:?}",
-                        stringify!($g),
-                        *guard
-                    );
-                }
+                tracing::warn!(
+                    "{} recovered from poisoning: {:?}",
+                    stringify!($g),
+                    *guard
+                );
                 guard
                 */
             }
