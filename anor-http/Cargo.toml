@@ -13,12 +13,13 @@ categories = ["data-structures", "caching", "database", "filesystem"]
 
 [dependencies]
 tracing = "0.1"
-hyper = { version = "1.0.0-rc.4", features = ["full"] }
+hyper = { version = "1", features = ["full"] }
 tokio = { version = "1", features = ["full"] }
 tokio-util = "0.7"
-http = "0.2"
-hyper-util = { git = "https://github.com/hyperium/hyper-util.git" }
-http-body-util = "0.1.0-rc.3"
+http = "1"
+hyper-util = { version = "0.1", features = ["full"] }
+futures-util = { version = "0.3", default-features = false }
+http-body-util = "0.1"
 bytes = "1"
 
 http_common = "0.2.2"
