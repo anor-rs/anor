@@ -1,5 +1,5 @@
 /// Cargo build profile
-/// https://doc.rust-lang.org/cargo/reference/profiles.html
+/// <https://doc.rust-lang.org/cargo/reference/profiles.html>
 #[derive(Debug, PartialEq)]
 pub enum CargoProfile {
     /// cargo build --release
